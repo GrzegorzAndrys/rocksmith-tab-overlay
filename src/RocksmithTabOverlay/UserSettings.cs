@@ -14,6 +14,8 @@ internal sealed class UserSettings
     public double CustomTopRatio { get; set; } = 0.012;
     public double CustomWidthRatio { get; set; } = 1.0;
     public double CustomHeightRatio { get; set; } = 0.47;
+    public double BackgroundOpacity { get; set; } = 0.84;
+    public double OverlayOpacity { get; set; } = 1.0;
 
     private static string SettingsDirectory => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),

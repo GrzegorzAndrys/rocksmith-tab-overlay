@@ -33,7 +33,7 @@ public sealed class TabSurface : FrameworkElement
     private static readonly Brush StatusFill = BrushFrom(235, 20, 23, 30);
     private static readonly Pen StatusPen = PenFrom(BrushFrom(180, 72, 214, 255), 1.5);
 
-    private static readonly Brush PanelBrush = BrushFrom(215, 8, 10, 14);
+    private Brush _panelBrush = BrushFrom(215, 8, 10, 14);
     private static readonly Brush ActiveSystemFill = BrushFrom(34, 72, 214, 255);
     private static readonly Brush InactiveSystemFill = BrushFrom(22, 255, 255, 255);
     private static readonly Pen ActiveSystemPen = PenFrom(BrushFrom(105, 72, 214, 255), 1);
@@ -86,8 +86,16 @@ public sealed class TabSurface : FrameworkElement
         StaticPageMode = settings.StaticPageMode;
         NotationScale = Math.Round(Math.Clamp(settings.NotationScale, 0.7, 1.5), 1);
         BarsVisible = settings.BarsVisible is 2 or 4 or 6 or 8 ? settings.BarsVisible : 4;
+        SetBackgroundOpacity(settings.BackgroundOpacity);
         _textCache.Clear();
         _liveTextCache.Clear();
+    }
+
+    internal void SetBackgroundOpacity(double opacity)
+    {
+        var alpha = (byte)Math.Round(Math.Clamp(opacity, 0.0, 1.0) * 255);
+        _panelBrush = BrushFrom(alpha, 8, 10, 14);
+        InvalidateVisual();
     }
 
     public void ShowStatus(string message)
@@ -119,7 +127,7 @@ public sealed class TabSurface : FrameworkElement
         var h = ActualHeight;
         if (w < 200 || h < 140) return;
 
-        dc.DrawRoundedRectangle(PanelBrush, null, new Rect(0, 0, w, h), 14, 14);
+        dc.DrawRoundedRectangle(_panelBrush, null, new Rect(0, 0, w, h), 14, 14);
 
         if (Song == null || Arrangement?.Data == null)
         {

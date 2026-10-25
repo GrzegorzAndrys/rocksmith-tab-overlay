@@ -66,6 +66,7 @@ public partial class MainWindow : Window
     private IntPtr _rocksmithWindow;
     private bool _rocksmithIsActive;
     private bool _layoutKeyWasDown;
+    private bool _initializingTransparency = true;
     private HwndSource? _source;
 
     private string SnifferUrl
@@ -83,7 +84,14 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        _settings.BackgroundOpacity = Math.Clamp(_settings.BackgroundOpacity, 0.0, 1.0);
+        _settings.OverlayOpacity = Math.Clamp(_settings.OverlayOpacity, 0.15, 1.0);
         Tab.ApplySettings(_settings);
+        Tab.Opacity = _settings.OverlayOpacity;
+        BackgroundOpacitySlider.Value = _settings.BackgroundOpacity;
+        OverlayOpacitySlider.Value = _settings.OverlayOpacity;
+        _initializingTransparency = false;
+        UpdateOpacityLabels();
         Tab.MissedEvents = _missedEvents;
         Loaded += OnLoaded;
         Closed += OnClosed;
@@ -113,6 +121,8 @@ public partial class MainWindow : Window
 
     private void OnClosed(object? sender, EventArgs e)
     {
+        if (_layoutEditMode)
+            SaveCustomPlacement();
         CompositionTarget.Rendering -= OnRendering;
         _pollTimer.Stop();
         _positionTimer.Stop();
@@ -220,7 +230,8 @@ public partial class MainWindow : Window
 
     private void OnWindowMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (!_layoutEditMode || ResizeGrip.IsMouseOver || e.ChangedButton != MouseButton.Left) return;
+        if (!_layoutEditMode || ResizeGrip.IsMouseOver || EditHint.IsMouseOver ||
+            e.ChangedButton != MouseButton.Left) return;
         try
         {
             DragMove();
@@ -245,14 +256,36 @@ public partial class MainWindow : Window
 
     private void SaveCustomPlacement()
     {
-        if (!_settings.CustomPlacementEnabled || _rocksmithClientWidth < 1 || _rocksmithClientHeight < 1)
-            return;
-
-        _settings.CustomLeftRatio = (Left - _rocksmithClientLeft) / _rocksmithClientWidth;
-        _settings.CustomTopRatio = (Top - _rocksmithClientTop) / _rocksmithClientHeight;
-        _settings.CustomWidthRatio = Math.Clamp(Width / _rocksmithClientWidth, 0.20, 2.0);
-        _settings.CustomHeightRatio = Math.Clamp(Height / _rocksmithClientHeight, 0.15, 1.5);
+        if (_settings.CustomPlacementEnabled && _rocksmithClientWidth >= 1 && _rocksmithClientHeight >= 1)
+        {
+            _settings.CustomLeftRatio = (Left - _rocksmithClientLeft) / _rocksmithClientWidth;
+            _settings.CustomTopRatio = (Top - _rocksmithClientTop) / _rocksmithClientHeight;
+            _settings.CustomWidthRatio = Math.Clamp(Width / _rocksmithClientWidth, 0.20, 2.0);
+            _settings.CustomHeightRatio = Math.Clamp(Height / _rocksmithClientHeight, 0.15, 1.5);
+        }
         _settings.Save();
+    }
+
+    private void OnBackgroundOpacityChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_initializingTransparency) return;
+        _settings.BackgroundOpacity = Math.Clamp(e.NewValue, 0.0, 1.0);
+        Tab.SetBackgroundOpacity(_settings.BackgroundOpacity);
+        UpdateOpacityLabels();
+    }
+
+    private void OnOverlayOpacityChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_initializingTransparency) return;
+        _settings.OverlayOpacity = Math.Clamp(e.NewValue, 0.15, 1.0);
+        Tab.Opacity = _settings.OverlayOpacity;
+        UpdateOpacityLabels();
+    }
+
+    private void UpdateOpacityLabels()
+    {
+        BackgroundOpacityValue.Text = $"{_settings.BackgroundOpacity:P0}";
+        OverlayOpacityValue.Text = $"{_settings.OverlayOpacity:P0}";
     }
 
     private void SaveSettings()

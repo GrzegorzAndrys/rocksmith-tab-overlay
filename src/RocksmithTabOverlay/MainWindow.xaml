@@ -8,22 +8,56 @@
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" ShowInTaskbar="False" ShowActivated="False" Topmost="True"
         MouseLeftButtonDown="OnWindowMouseLeftButtonDown">
-    <Grid>
+    <Grid Background="#01000000">
         <local:TabSurface x:Name="Tab" Margin="12" IsHitTestVisible="False" />
 
         <Border x:Name="EditFrame"
                 Margin="4" BorderThickness="2" CornerRadius="12"
-                BorderBrush="#FF48D6FF" Background="#1800BFEF"
+                BorderBrush="#FF48D6FF" Background="Transparent"
                 IsHitTestVisible="False" Visibility="Collapsed" />
 
         <Border x:Name="EditHint"
                 HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,7,0,0"
                 Padding="14,6" CornerRadius="7"
                 Background="#EF121820" BorderBrush="#FF48D6FF" BorderThickness="1"
-                IsHitTestVisible="False" Visibility="Collapsed">
-            <TextBlock Text="DRAG TO MOVE   •   DRAG CORNER TO RESIZE   •   F TO LOCK"
-                       Foreground="White" FontFamily="Consolas" FontSize="12"
-                       FontWeight="SemiBold" />
+                Visibility="Collapsed">
+            <StackPanel Width="460">
+                <TextBlock Text="DRAG TO MOVE   •   DRAG CORNER TO RESIZE   •   F TO LOCK"
+                           Foreground="White" FontFamily="Consolas" FontSize="12"
+                           FontWeight="SemiBold" HorizontalAlignment="Center" />
+                <Grid Margin="0,7,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="120" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="50" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="24" />
+                        <RowDefinition Height="24" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="DARK BACKGROUND"
+                               Foreground="#FFB9C4D0" FontFamily="Consolas" FontSize="11"
+                               VerticalAlignment="Center" />
+                    <Slider x:Name="BackgroundOpacitySlider" Grid.Row="0" Grid.Column="1"
+                            Minimum="0" Maximum="1" TickFrequency="0.05"
+                            IsSnapToTickEnabled="True" Margin="8,0"
+                            ValueChanged="OnBackgroundOpacityChanged" />
+                    <TextBlock x:Name="BackgroundOpacityValue" Grid.Row="0" Grid.Column="2"
+                               Foreground="White" FontFamily="Consolas" FontSize="11"
+                               TextAlignment="Right" VerticalAlignment="Center" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="EVERYTHING"
+                               Foreground="#FFB9C4D0" FontFamily="Consolas" FontSize="11"
+                               VerticalAlignment="Center" />
+                    <Slider x:Name="OverlayOpacitySlider" Grid.Row="1" Grid.Column="1"
+                            Minimum="0.15" Maximum="1" TickFrequency="0.05"
+                            IsSnapToTickEnabled="True" Margin="8,0"
+                            ValueChanged="OnOverlayOpacityChanged" />
+                    <TextBlock x:Name="OverlayOpacityValue" Grid.Row="1" Grid.Column="2"
+                               Foreground="White" FontFamily="Consolas" FontSize="11"
+                               TextAlignment="Right" VerticalAlignment="Center" />
+                </Grid>
+            </StackPanel>
         </Border>
 
         <Border x:Name="ResizeGrip"
