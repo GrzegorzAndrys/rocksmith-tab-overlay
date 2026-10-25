@@ -74,6 +74,7 @@ public sealed class TabSurface : FrameworkElement
     private ArrangementData? _spacingArrangement;
     private double[] _spacingBoundaries = [0, 1];
     private double[] _spacingFloorPerSecond = [0];
+    private double[] _spacingCumulative = [0, 0];
     private double[] _scrollBoundaryX = [double.NaN, double.NaN];
     private bool _scrollLayoutReady;
 
@@ -158,7 +159,8 @@ public sealed class TabSurface : FrameworkElement
         var right = w - 18.0;
         if (StaticPageMode)
         {
-            var page = GetTwoRowPage();
+            EnsureSpacingModel(Arrangement.Data);
+            var page = GetTwoRowPage(right - left);
             var contentTop = 66.0;
             var contentBottom = h - 16.0;
             var gap = 24.0;
@@ -188,12 +190,16 @@ public sealed class TabSurface : FrameworkElement
         var stringTop = regionTop + 24;
         var stringBottom = regionBottom - 18;
         var spacing = (stringBottom - stringTop) / 5.0;
-        var pixelsPerSecond = scrolling
-            ? PixelsPerSecond
-            : (right - left) / Math.Max(0.1, rangeEnd - rangeStart);
+        var pageDuration = Math.Max(0.1, rangeEnd - rangeStart);
+        var minimumPageWidth = MinimumSpacingWidth(rangeStart, rangeEnd);
+        var pageExtraSpeed = Math.Max(0, (right - left - minimumPageWidth) / pageDuration);
+        double TimeToX(double time) => scrolling
+            ? ScrollTimeToX(time, Math.Max(left + 100, ActualWidth * 0.31))
+            : left + MinimumSpacingWidth(rangeStart, Math.Clamp(time, rangeStart, rangeEnd)) +
+                (Math.Clamp(time, rangeStart, rangeEnd) - rangeStart) * pageExtraSpeed;
         var playhead = scrolling
             ? Math.Max(left + 100, ActualWidth * 0.31)
-            : Math.Clamp(left + (SongTime - rangeStart) * pixelsPerSecond, left, right);
+            : Math.Clamp(TimeToX(SongTime), left, right);
 
         dc.DrawRoundedRectangle(
             active ? ActiveSystemFill : InactiveSystemFill,
@@ -204,8 +210,8 @@ public sealed class TabSurface : FrameworkElement
         {
             var currentStart = Arrangement.Data.Measures.LastOrDefault(m => m.Time <= SongTime)?.Time ?? rangeStart;
             var currentEnd = Arrangement.Data.Measures.FirstOrDefault(m => m.Time > SongTime)?.Time ?? rangeEnd;
-            var currentLeft = Math.Clamp(left + (currentStart - rangeStart) * pixelsPerSecond, left, right);
-            var currentRight = Math.Clamp(left + (currentEnd - rangeStart) * pixelsPerSecond, left, right);
+            var currentLeft = Math.Clamp(TimeToX(currentStart), left, right);
+            var currentRight = Math.Clamp(TimeToX(currentEnd), left, right);
             dc.DrawRectangle(CurrentMeasureFill, null,
                 new Rect(currentLeft, regionTop + 1, Math.Max(0, currentRight - currentLeft), regionBottom - regionTop - 2));
         }
@@ -221,9 +227,7 @@ public sealed class TabSurface : FrameworkElement
         foreach (var measure in Arrangement.Data.Measures)
         {
             if (measure.Time < rangeStart || measure.Time > rangeEnd) continue;
-            var x = scrolling
-                ? ScrollTimeToX(measure.Time, playhead)
-                : left + (measure.Time - rangeStart) * pixelsPerSecond;
+            var x = TimeToX(measure.Time);
             if (scrolling && (x < left - 1 || x > right + 1)) continue;
             x = SnapX(x);
             dc.DrawLine(MeasureLinePen,
@@ -236,9 +240,7 @@ public sealed class TabSurface : FrameworkElement
             ? time >= rangeStart - 0.1 && time <= rangeEnd + 0.1
             : time >= rangeStart && time < rangeEnd;
 
-        double NoteX(double time) => SnapX(scrolling
-            ? ScrollTimeToX(time, playhead)
-            : left + (time - rangeStart) * pixelsPerSecond);
+        double NoteX(double time) => SnapX(TimeToX(time));
 
         var events = Arrangement.Data.TabEvents;
 
@@ -322,7 +324,7 @@ public sealed class TabSurface : FrameworkElement
                 {
                     var endX = Math.Min(right, scrolling
                         ? ScrollTimeToX(noteEndTime, playhead)
-                        : x + note.Sustain * pixelsPerSecond);
+                        : TimeToX(noteEndTime));
                     var sustainPen = state switch
                     {
                         NoteVisualState.Played => PlayedSustainPens[row],
@@ -440,6 +442,7 @@ public sealed class TabSurface : FrameworkElement
 
         _spacingBoundaries = boundaryTimes;
         _spacingFloorPerSecond = new double[boundaryTimes.Length - 1];
+        _spacingCumulative = new double[boundaryTimes.Length];
         _scrollBoundaryX = new double[boundaryTimes.Length];
         var boundaryIndexes = boundaryTimes
             .Select((time, index) => (time, index))
@@ -468,7 +471,30 @@ public sealed class TabSurface : FrameworkElement
             }
         }
 
+        for (var interval = 0; interval < _spacingFloorPerSecond.Length; interval++)
+        {
+            _spacingCumulative[interval + 1] = _spacingCumulative[interval] +
+                _spacingFloorPerSecond[interval] *
+                (_spacingBoundaries[interval + 1] - _spacingBoundaries[interval]);
+        }
+
         _scrollLayoutReady = false;
+    }
+
+    private double MinimumSpacingWidth(double startTime, double endTime)
+    {
+        if (endTime <= startTime) return 0;
+        return Math.Max(0, SpacingCoordinate(endTime) - SpacingCoordinate(startTime)) * NotationScale;
+    }
+
+    private double SpacingCoordinate(double time)
+    {
+        if (time <= _spacingBoundaries[0]) return _spacingCumulative[0];
+        if (time >= _spacingBoundaries[^1]) return _spacingCumulative[^1];
+
+        var interval = FindSpacingInterval(time);
+        return _spacingCumulative[interval] + _spacingFloorPerSecond[interval] *
+            (time - _spacingBoundaries[interval]);
     }
 
     private void PrepareScrollLayout(ArrangementData arrangement, double playhead,
@@ -677,7 +703,8 @@ public sealed class TabSurface : FrameworkElement
         dc.DrawText(text, Snap(new Point(centerX - text.Width / 2, centerY - text.Height / 2)));
     }
 
-    private (double Row1Start, double Row1End, double Row2Start, double Row2End) GetTwoRowPage()
+    private (double Row1Start, double Row1End, double Row2Start, double Row2End) GetTwoRowPage(
+        double availableWidth)
     {
         var measures = Arrangement?.Data?.Measures;
         if (measures == null || measures.Count < 2)
@@ -691,20 +718,43 @@ public sealed class TabSurface : FrameworkElement
         for (var i = 1; i < measures.Count && measures[i].Time <= SongTime; i++)
             active = i;
 
-        // The current system always occupies the upper row. At its final bar the
-        // lower preview is promoted to the top and a new preview is placed below,
-        // matching the rolling two-system layout used by conventional TAB readers.
-        var first = active / BarsVisible * BarsVisible;
-        var row1Start = first == 0 && SongTime < measures[0].Time ? 0 : measures[first].Time;
         var averageBar = measures.Count > 1 ? Math.Max(0.5, measures[1].Time - measures[0].Time) : 2.0;
         var songEnd = Song?.SongLength ?? 0;
         double Boundary(int index, double fallbackStart) => index < measures.Count
             ? measures[index].Time
             : songEnd > fallbackStart ? songEnd : fallbackStart + BarsVisible * averageBar;
 
-        var row1End = Boundary(first + BarsVisible, row1Start);
+        int FittedPageEnd(int start)
+        {
+            if (start >= measures.Count) return measures.Count;
+            var maximumEnd = Math.Min(measures.Count, start + BarsVisible);
+            var startTime = measures[start].Time;
+            var usableWidth = Math.Max(120, availableWidth - 52 * NotationScale);
+            for (var end = maximumEnd; end > start + 1; end--)
+            {
+                if (MinimumSpacingWidth(startTime, Boundary(end, startTime)) <= usableWidth)
+                    return end;
+            }
+            return Math.Min(measures.Count, start + 1);
+        }
+
+        // BarsVisible is a maximum. Walk the content-aware pages from the start
+        // so promotion stays deterministic; dense passages use fewer bars rather
+        // than sacrificing full-size fret numbers.
+        var first = 0;
+        var firstEnd = FittedPageEnd(first);
+        while (active >= firstEnd && firstEnd < measures.Count)
+        {
+            first = firstEnd;
+            firstEnd = FittedPageEnd(first);
+        }
+
+        var row1Start = first == 0 && SongTime < measures[0].Time ? 0 : measures[first].Time;
+
+        var row1End = Boundary(firstEnd, row1Start);
         var row2Start = row1End;
-        var row2End = Boundary(first + BarsVisible * 2, row2Start);
+        var secondEnd = FittedPageEnd(firstEnd);
+        var row2End = Boundary(secondEnd, row2Start);
         if (row2End <= row2Start)
             row2End = row2Start + BarsVisible * averageBar;
         return (row1Start, row1End, row2Start, row2End);
@@ -737,7 +787,7 @@ public sealed class TabSurface : FrameworkElement
                 ? Arrangement.Name
                 : $"{Arrangement.Type} / {Arrangement.Name}";
         var viewDetail = StaticPageMode
-            ? $"{mode}  •  {BarsVisible} BARS/ROW"
+            ? $"{mode}  •  UP TO {BarsVisible} BARS/ROW"
             : $"{mode} COMPRESSION";
         var detail = Arrangement == null ? "waiting for Rocksmith" :
             $"{arrangementName}  •  {viewDetail}  •  {zoom}%";

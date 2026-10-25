@@ -29,7 +29,9 @@ the game. No chart conversion or duplicate TAB file is required.
 
 The default two-row view behaves like a rolling page: play through the upper row,
 then the lower preview is promoted to the top. The playhead always stays on the
-upper row, so the TAB does not disappear underneath it.
+upper row, so the TAB does not disappear underneath it. The selected bars-per-row
+value is a maximum: dense passages borrow space from rests and automatically use
+fewer bars when necessary, keeping fret numbers separated and full-size.
 
 Press `F7` for a continuous Songsterr-style view. Notes move through a fixed
 playhead while completed notes dim and correlated misses turn gray. Press `F9`
@@ -84,7 +86,7 @@ cache.
 | Key | Action |
 | --- | --- |
 | `F` | Unlock/lock layout editing; move, resize, and adjust background/content opacity |
-| `F4` | Cycle 2, 4, 6, or 8 bars per row |
+| `F4` | Cycle a maximum of 2, 4, 6, or 8 bars per row |
 | `F5` / `F6` | Shrink or enlarge notation (70% to 150%) |
 | `F7` | Toggle two-row TAB page / continuous scroll |
 | `F8` | Show or hide the overlay |
