@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>RocksmithTabOverlay</AssemblyName>
+    <RootNamespace>RocksmithTabOverlay</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Version>0.1.0</Version>
+    <AssemblyTitle>Rocksmith TAB Overlay</AssemblyTitle>
+    <Description>Synchronized tablature overlay for Rocksmith 2014 Remastered</Description>
+    <RepositoryUrl>https://github.com/GrzegorzAndrys/rocksmith-tab-overlay</RepositoryUrl>
+  </PropertyGroup>
+</Project>

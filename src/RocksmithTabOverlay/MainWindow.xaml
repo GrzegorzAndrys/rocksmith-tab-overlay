@@ -1,0 +1,10 @@
+<Window x:Class="RocksmithTabOverlay.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:RocksmithTabOverlay"
+        Title="Rocksmith TAB Overlay"
+        Width="1200" Height="390"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" ShowInTaskbar="False" ShowActivated="False" Topmost="True">
+    <local:TabSurface x:Name="Tab" Margin="12" />
+</Window>

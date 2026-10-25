@@ -1,0 +1,28 @@
+# Build output and local deployments
+/dist*/
+/build-test*/
+/artifacts/
+**/bin/
+**/obj/
+
+# Runtime state (never commit caches, logs, or local preferences)
+user-settings.json
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.log
+/output/
+/config/
+/window-diagnostic.json
+
+# Visual Studio / Rider / VS Code
+.vs/
+.idea/
+*.user
+*.suo
+*.DotSettings.user
+.vscode/
+
+# OS
+Thumbs.db
+.DS_Store

@@ -1,0 +1,34 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build self-contained package
+        shell: pwsh
+        run: .\build.ps1 -Clean -SelfContained -CreateArchive
+
+      - name: Publish GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $zip = Get-ChildItem artifacts\RocksmithTabOverlay-*-win-x64.zip | Select-Object -First 1
+          if (-not $zip) { throw 'Release archive was not created' }
+          gh release create $env:GITHUB_REF_NAME $zip.FullName --title $env:GITHUB_REF_NAME --generate-notes

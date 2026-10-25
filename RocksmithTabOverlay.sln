@@ -1,0 +1,53 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{C155BF43-A0A2-488A-A322-16AE9B23734B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RocksmithTabOverlay", "src\RocksmithTabOverlay\RocksmithTabOverlay.csproj", "{A72ADDA5-3876-4D78-93C8-B2FE8AC25AA6}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "vendor", "vendor", "{A79E19FE-38CF-4E2F-A36C-3A77837952E0}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "RockSniffer", "RockSniffer", "{DE4DFFBD-0CB8-4EE6-8B40-905153ACEE80}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RockSniffer", "vendor\RockSniffer\RockSniffer\RockSniffer.csproj", "{68469C4B-1A9A-44B6-901F-E04D2E340965}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RockSnifferLib", "vendor\RockSniffer\RockSnifferLib\RockSnifferLib.csproj", "{B1CA634D-8457-41C3-BFE0-A13A857194A8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Rocksmith2014PsarcLib", "vendor\RockSniffer\Rocksmith2014PsarcLib\Rocksmith2014PsarcLib.csproj", "{C6C3E0D0-AF75-433B-BC72-B7E33ACDF1F9}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A72ADDA5-3876-4D78-93C8-B2FE8AC25AA6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A72ADDA5-3876-4D78-93C8-B2FE8AC25AA6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A72ADDA5-3876-4D78-93C8-B2FE8AC25AA6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A72ADDA5-3876-4D78-93C8-B2FE8AC25AA6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{68469C4B-1A9A-44B6-901F-E04D2E340965}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{68469C4B-1A9A-44B6-901F-E04D2E340965}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{68469C4B-1A9A-44B6-901F-E04D2E340965}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{68469C4B-1A9A-44B6-901F-E04D2E340965}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B1CA634D-8457-41C3-BFE0-A13A857194A8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B1CA634D-8457-41C3-BFE0-A13A857194A8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B1CA634D-8457-41C3-BFE0-A13A857194A8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B1CA634D-8457-41C3-BFE0-A13A857194A8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C6C3E0D0-AF75-433B-BC72-B7E33ACDF1F9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C6C3E0D0-AF75-433B-BC72-B7E33ACDF1F9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C6C3E0D0-AF75-433B-BC72-B7E33ACDF1F9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C6C3E0D0-AF75-433B-BC72-B7E33ACDF1F9}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{A72ADDA5-3876-4D78-93C8-B2FE8AC25AA6} = {C155BF43-A0A2-488A-A322-16AE9B23734B}
+		{DE4DFFBD-0CB8-4EE6-8B40-905153ACEE80} = {A79E19FE-38CF-4E2F-A36C-3A77837952E0}
+		{68469C4B-1A9A-44B6-901F-E04D2E340965} = {DE4DFFBD-0CB8-4EE6-8B40-905153ACEE80}
+		{B1CA634D-8457-41C3-BFE0-A13A857194A8} = {DE4DFFBD-0CB8-4EE6-8B40-905153ACEE80}
+		{C6C3E0D0-AF75-433B-BC72-B7E33ACDF1F9} = {DE4DFFBD-0CB8-4EE6-8B40-905153ACEE80}
+	EndGlobalSection
+EndGlobal
