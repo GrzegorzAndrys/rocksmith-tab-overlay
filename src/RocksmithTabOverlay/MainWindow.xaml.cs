@@ -288,6 +288,39 @@ public partial class MainWindow : Window
         OverlayOpacityValue.Text = $"{_settings.OverlayOpacity:P0}";
     }
 
+    private void OnRestartOverlayClick(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        SaveCustomPlacement();
+        SaveSettings();
+
+        var executablePath = Environment.ProcessPath;
+        if (string.IsNullOrWhiteSpace(executablePath))
+        {
+            Tab.ShowStatus("RESTART FAILED — EXECUTABLE NOT FOUND");
+            return;
+        }
+
+        try
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = executablePath,
+                WorkingDirectory = AppContext.BaseDirectory,
+                UseShellExecute = true,
+            };
+            foreach (var argument in Environment.GetCommandLineArgs().Skip(1))
+                startInfo.ArgumentList.Add(argument);
+
+            Process.Start(startInfo);
+            Application.Current.Shutdown();
+        }
+        catch (Exception)
+        {
+            Tab.ShowStatus("RESTART FAILED");
+        }
+    }
+
     private void SaveSettings()
     {
         _settings.StaticPageMode = Tab.StaticPageMode;

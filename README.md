@@ -34,8 +34,9 @@ playhead while completed notes dim and correlated misses turn gray.
 ![Continuous scrolling TAB view during gameplay](docs/scroll-gameplay.png)
 
 Press `F` to unlock the overlay. You can drag it, resize it from the lower-right
-corner, and separately change the dark background and whole-TAB opacity. Press
-`F` again to save the layout and make the overlay click-through.
+corner, and separately change the dark background and whole-TAB opacity. Click
+**Restart overlay** to relaunch it without closing Rocksmith, or press `F` again
+to save the layout and make the overlay click-through.
 
 ![Unlocked overlay showing move, resize, and opacity controls](docs/layout-edit.png)
 
@@ -85,7 +86,8 @@ cache.
 The overlay is click-through while locked. Press `F` to enter layout-edit mode,
 drag anywhere on the overlay to move it, drag the highlighted lower-right corner
 to resize it, and use the two sliders to fade either the dark background alone or
-the entire TAB layer. Press `F` again to save and return to click-through mode.
+the entire TAB layer. The same panel can restart the overlay while leaving
+Rocksmith open. Press `F` again to save and return to click-through mode.
 Custom bounds are stored relative to Rocksmith's client area, so the placement
 scales sensibly when the game resolution or Windows DPI changes.
 

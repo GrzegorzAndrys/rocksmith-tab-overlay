@@ -57,6 +57,13 @@
                                Foreground="White" FontFamily="Consolas" FontSize="11"
                                TextAlignment="Right" VerticalAlignment="Center" />
                 </Grid>
+                <Button Content="RESTART OVERLAY"
+                        HorizontalAlignment="Right" Margin="0,7,0,0" Padding="12,4"
+                        Background="#FF1F2C36" Foreground="White"
+                        BorderBrush="#FF48D6FF" BorderThickness="1"
+                        FontFamily="Consolas" FontSize="11" FontWeight="SemiBold"
+                        Cursor="Hand" Click="OnRestartOverlayClick"
+                        ToolTip="Save the layout and restart the TAB overlay" />
             </StackPanel>
         </Border>
 
