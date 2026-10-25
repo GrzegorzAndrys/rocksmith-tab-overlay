@@ -33,7 +33,9 @@ upper row, so the TAB does not disappear underneath it.
 
 Press `F7` for a continuous Songsterr-style view. Notes move through a fixed
 playhead while completed notes dim and correlated misses turn gray. Press `F9`
-to cycle linear, light, medium, and strong future-bar compression.
+to cycle linear, light, medium, and strong future-bar compression. Dense runs
+automatically keep enough engraving space for full-size fret numbers, so the
+curve compresses empty rhythmic space instead of shrinking or stacking notes.
 
 ![Continuous scrolling TAB view during gameplay](docs/scroll-gameplay.png)
 

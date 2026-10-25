@@ -71,9 +71,11 @@ public sealed class TabSurface : FrameworkElement
     private double _pixelsPerDip = 1.0;
     private double _dpiScaleX = 1.0;
     private double _dpiScaleY = 1.0;
-    private List<TabEvent>? _neighborEvents;
-    private int[][] _previousEventByString = [];
-    private int[][] _nextEventByString = [];
+    private ArrangementData? _spacingArrangement;
+    private double[] _spacingBoundaries = [0, 1];
+    private double[] _spacingFloorPerSecond = [0];
+    private double[] _scrollBoundaryX = [double.NaN, double.NaN];
+    private bool _scrollLayoutReady;
 
     public SongDetails? Song { get; set; }
     public ArrangementDetails? Arrangement { get; set; }
@@ -171,6 +173,7 @@ public sealed class TabSurface : FrameworkElement
             var playhead = Math.Max(left + 100, w * 0.31);
             var rangeStart = SongTime - ScrollSecondsForDistance(playhead - left);
             var rangeEnd = SongTime + ScrollSecondsForDistance(right - playhead);
+            PrepareScrollLayout(Arrangement.Data, playhead, rangeStart, rangeEnd);
             DrawTabSystem(dc, left, right, 70, h - 22, rangeStart, rangeEnd, true, true);
         }
 
@@ -221,6 +224,7 @@ public sealed class TabSurface : FrameworkElement
             var x = scrolling
                 ? ScrollTimeToX(measure.Time, playhead)
                 : left + (measure.Time - rangeStart) * pixelsPerSecond;
+            if (scrolling && (x < left - 1 || x > right + 1)) continue;
             x = SnapX(x);
             dc.DrawLine(MeasureLinePen,
                 new Point(x, stringTop - 10), new Point(x, stringBottom + 8));
@@ -236,11 +240,7 @@ public sealed class TabSurface : FrameworkElement
             ? ScrollTimeToX(time, playhead)
             : left + (time - rangeStart) * pixelsPerSecond);
 
-        // Cache the neighboring event indexes once per arrangement. Per-frame
-        // collision sizing then needs no dictionaries or other transient objects,
-        // which matters when rendering at 144–240 Hz.
         var events = Arrangement.Data.TabEvents;
-        EnsureNoteNeighbors(events);
 
         var previousNoteX = Enumerable.Repeat(double.NaN, 6).ToArray();
         var previousNoteRadius = new double[6];
@@ -255,6 +255,7 @@ public sealed class TabSurface : FrameworkElement
             if (!NoteIsVisible(note.Time)) continue;
 
             var x = NoteX(note.Time);
+            if (scrolling && (x < left - 48 || x > right + 48)) continue;
             var noteEndTime = note.Time + Math.Max(0, note.Sustain);
             var completed = note.Sustain > 0.08
                 ? noteEndTime < SongTime - 0.04
@@ -277,14 +278,6 @@ public sealed class TabSurface : FrameworkElement
                     : fret is >= 0 and < 25 ? FretLabels[fret]
                     : fret.ToString(CultureInfo.InvariantCulture);
                 var radius = (label.Length > 1 ? 21.5 : 18.5) * NotationScale;
-                var previousEvent = _previousEventByString[stringIndex][noteIndex];
-                if (previousEvent >= 0 && NoteIsVisible(events[previousEvent].Time))
-                    radius = Math.Min(radius, CollisionRadius(x, NoteX(events[previousEvent].Time)));
-                var nextEvent = _nextEventByString[stringIndex][noteIndex];
-                if (nextEvent >= 0 && NoteIsVisible(events[nextEvent].Time))
-                    radius = Math.Min(radius, CollisionRadius(x, NoteX(events[nextEvent].Time)));
-                var verticalRadius = Math.Min(18.5 * NotationScale,
-                    Math.Max(2.5, radius * 0.92));
 
                 var legato = note.HammerOn && note.PullOff ? "H/P"
                     : note.HammerOn ? "H"
@@ -320,10 +313,9 @@ public sealed class TabSurface : FrameworkElement
                 };
 
                 dc.DrawEllipse(noteFill, notePen,
-                    new Point(x, y), radius, verticalRadius);
-                var ft = MakeFittedText(label, 23 * NotationScale,
-                    labelBrush, FontWeights.Bold,
-                    Math.Max(1, radius * 2 - 3), Math.Max(1, verticalRadius * 2 - 2));
+                    new Point(x, y), radius, 18.5 * NotationScale);
+                var ft = MakeText(label, 23 * NotationScale,
+                    labelBrush, FontWeights.Bold);
                 dc.DrawText(ft, Snap(new Point(x - ft.Width / 2, y - ft.Height / 2)));
 
                 if (note.Sustain > 0.08)
@@ -394,6 +386,34 @@ public sealed class TabSurface : FrameworkElement
 
     private double ScrollTimeToX(double time, double playhead)
     {
+        if (_scrollLayoutReady && time >= _spacingBoundaries[0] &&
+            time <= _spacingBoundaries[^1])
+        {
+            var interval = FindSpacingInterval(time);
+            if (time >= SongTime)
+            {
+                var anchorTime = Math.Max(SongTime, _spacingBoundaries[interval]);
+                var anchorX = anchorTime == SongTime
+                    ? playhead
+                    : _scrollBoundaryX[interval];
+                if (!double.IsNaN(anchorX))
+                    return anchorX + IntegrateScrollSpeed(
+                        anchorTime - SongTime, time - SongTime,
+                        _spacingFloorPerSecond[interval] * NotationScale);
+            }
+            else
+            {
+                var anchorTime = Math.Min(SongTime, _spacingBoundaries[interval + 1]);
+                var anchorX = anchorTime == SongTime
+                    ? playhead
+                    : _scrollBoundaryX[interval + 1];
+                if (!double.IsNaN(anchorX))
+                    return anchorX - IntegrateScrollSpeed(
+                        SongTime - anchorTime, SongTime - time,
+                        _spacingFloorPerSecond[interval] * NotationScale);
+            }
+        }
+
         var seconds = time - SongTime;
         var strength = ScrollCompressionStrengths[ScrollCompressionLevel];
         if (strength <= 0)
@@ -403,48 +423,139 @@ public sealed class TabSurface : FrameworkElement
         return playhead + Math.CopySign(distance, seconds);
     }
 
-    private void EnsureNoteNeighbors(List<TabEvent> events)
+    private void EnsureSpacingModel(ArrangementData arrangement)
     {
-        if (ReferenceEquals(events, _neighborEvents)) return;
+        if (ReferenceEquals(arrangement, _spacingArrangement)) return;
 
-        _neighborEvents = events;
-        _previousEventByString = new int[6][];
-        _nextEventByString = new int[6][];
+        _spacingArrangement = arrangement;
+        var boundaryTimes = arrangement.TabEvents.Select(note => note.Time)
+            .Concat(arrangement.Measures.Select(measure => measure.Time))
+            .Append(0.0)
+            .Append(Math.Max(1.0, Song?.SongLength ?? 0))
+            .Distinct()
+            .OrderBy(time => time)
+            .ToArray();
+        if (boundaryTimes.Length < 2)
+            boundaryTimes = [0, 1];
+
+        _spacingBoundaries = boundaryTimes;
+        _spacingFloorPerSecond = new double[boundaryTimes.Length - 1];
+        _scrollBoundaryX = new double[boundaryTimes.Length];
+        var boundaryIndexes = boundaryTimes
+            .Select((time, index) => (time, index))
+            .ToDictionary(item => item.time, item => item.index);
+
         for (var stringIndex = 0; stringIndex < 6; stringIndex++)
         {
-            _previousEventByString[stringIndex] = new int[events.Count];
-            _nextEventByString[stringIndex] = new int[events.Count];
-            Array.Fill(_previousEventByString[stringIndex], -1);
-            Array.Fill(_nextEventByString[stringIndex], -1);
-        }
-
-        var neighboringEvent = Enumerable.Repeat(-1, 6).ToArray();
-        for (var noteIndex = 0; noteIndex < events.Count; noteIndex++)
-        {
-            var frets = events[noteIndex].Frets;
-            for (var stringIndex = 0; stringIndex < Math.Min(6, frets.Length); stringIndex++)
+            var markers = arrangement.TabEvents
+                .Where(note => stringIndex < note.Frets.Length && note.Frets[stringIndex] != -1)
+                .Select(note => (note.Time, Radius: BaseMarkerRadius(note.Frets[stringIndex])))
+                .OrderBy(marker => marker.Time)
+                .ToArray();
+            for (var markerIndex = 1; markerIndex < markers.Length; markerIndex++)
             {
-                if (frets[stringIndex] == -1) continue;
-                _previousEventByString[stringIndex][noteIndex] = neighboringEvent[stringIndex];
-                neighboringEvent[stringIndex] = noteIndex;
+                var previous = markers[markerIndex - 1];
+                var current = markers[markerIndex];
+                var duration = current.Time - previous.Time;
+                if (duration <= 0.0001) continue;
+
+                var requiredSpeed = (previous.Radius + current.Radius + 3.0) / duration;
+                var firstInterval = boundaryIndexes[previous.Time];
+                var finalBoundary = boundaryIndexes[current.Time];
+                for (var interval = firstInterval; interval < finalBoundary; interval++)
+                    _spacingFloorPerSecond[interval] = Math.Max(
+                        _spacingFloorPerSecond[interval], requiredSpeed);
             }
         }
 
-        Array.Fill(neighboringEvent, -1);
-        for (var noteIndex = events.Count - 1; noteIndex >= 0; noteIndex--)
-        {
-            var frets = events[noteIndex].Frets;
-            for (var stringIndex = 0; stringIndex < Math.Min(6, frets.Length); stringIndex++)
-            {
-                if (frets[stringIndex] == -1) continue;
-                _nextEventByString[stringIndex][noteIndex] = neighboringEvent[stringIndex];
-                neighboringEvent[stringIndex] = noteIndex;
-            }
-        }
+        _scrollLayoutReady = false;
     }
 
-    private static double CollisionRadius(double x, double neighborX) =>
-        Math.Max(1.5, Math.Abs(x - neighborX) / 2.0 - 1.5);
+    private void PrepareScrollLayout(ArrangementData arrangement, double playhead,
+        double rangeStart, double rangeEnd)
+    {
+        EnsureSpacingModel(arrangement);
+        Array.Fill(_scrollBoundaryX, double.NaN);
+
+        var currentInterval = FindSpacingInterval(SongTime);
+        var intervalStart = _spacingBoundaries[currentInterval];
+        var intervalEnd = _spacingBoundaries[currentInterval + 1];
+        var floor = _spacingFloorPerSecond[currentInterval] * NotationScale;
+        _scrollBoundaryX[currentInterval] = playhead - IntegrateScrollSpeed(
+            0, Math.Max(0, SongTime - intervalStart), floor);
+        _scrollBoundaryX[currentInterval + 1] = playhead + IntegrateScrollSpeed(
+            0, Math.Max(0, intervalEnd - SongTime), floor);
+
+        var preparedEnd = rangeEnd + 5.0;
+        for (var interval = currentInterval + 1;
+             interval < _spacingFloorPerSecond.Length &&
+             _spacingBoundaries[interval] <= preparedEnd;
+             interval++)
+        {
+            var distanceStart = Math.Max(0, _spacingBoundaries[interval] - SongTime);
+            var distanceEnd = Math.Max(0, _spacingBoundaries[interval + 1] - SongTime);
+            _scrollBoundaryX[interval + 1] = _scrollBoundaryX[interval] + IntegrateScrollSpeed(
+                distanceStart, distanceEnd,
+                _spacingFloorPerSecond[interval] * NotationScale);
+        }
+
+        var preparedStart = rangeStart - 5.0;
+        for (var interval = currentInterval - 1;
+             interval >= 0 && _spacingBoundaries[interval + 1] >= preparedStart;
+             interval--)
+        {
+            var distanceStart = Math.Max(0, SongTime - _spacingBoundaries[interval + 1]);
+            var distanceEnd = Math.Max(0, SongTime - _spacingBoundaries[interval]);
+            _scrollBoundaryX[interval] = _scrollBoundaryX[interval + 1] - IntegrateScrollSpeed(
+                distanceStart, distanceEnd,
+                _spacingFloorPerSecond[interval] * NotationScale);
+        }
+
+        _scrollLayoutReady = true;
+    }
+
+    private int FindSpacingInterval(double time)
+    {
+        var index = Array.BinarySearch(_spacingBoundaries, time);
+        if (index >= 0)
+            return Math.Min(index, _spacingFloorPerSecond.Length - 1);
+
+        return Math.Clamp(~index - 1, 0, _spacingFloorPerSecond.Length - 1);
+    }
+
+    private double IntegrateScrollSpeed(double distanceStart, double distanceEnd, double floor)
+    {
+        if (distanceEnd <= distanceStart) return 0;
+
+        var strength = ScrollCompressionStrengths[ScrollCompressionLevel];
+        if (strength <= 0)
+            return Math.Max(PixelsPerSecond, floor) * (distanceEnd - distanceStart);
+
+        double BaseIntegral(double start, double end) =>
+            PixelsPerSecond / strength * Math.Log(
+                (1.0 + strength * end) / (1.0 + strength * start));
+
+        if (floor <= 0)
+            return BaseIntegral(distanceStart, distanceEnd);
+
+        var crossover = (PixelsPerSecond / floor - 1.0) / strength;
+        if (crossover <= distanceStart)
+            return floor * (distanceEnd - distanceStart);
+        if (crossover >= distanceEnd)
+            return BaseIntegral(distanceStart, distanceEnd);
+
+        return BaseIntegral(distanceStart, crossover) +
+            floor * (distanceEnd - crossover);
+    }
+
+    private static double BaseMarkerRadius(int fret)
+    {
+        if (fret < -1) return 18.5;
+        var labelLength = fret is >= 0 and < 25
+            ? FretLabels[fret].Length
+            : fret.ToString(CultureInfo.InvariantCulture).Length;
+        return labelLength > 1 ? 21.5 : 18.5;
+    }
 
     private double ScrollSecondsForDistance(double pixels)
     {
@@ -743,21 +854,6 @@ public sealed class TabSurface : FrameworkElement
 
     private FormattedText MakeLiveText(string text, double size, Brush brush, FontWeight? weight = null) =>
         MakeTextCore(text, size, brush, weight, _liveTextCache, 64);
-
-    private FormattedText MakeFittedText(string text, double preferredSize, Brush brush,
-        FontWeight weight, double maximumWidth, double maximumHeight)
-    {
-        var formatted = MakeText(text, preferredSize, brush, weight);
-        var scale = Math.Min(1.0, Math.Min(
-            maximumWidth / Math.Max(0.1, formatted.Width),
-            maximumHeight / Math.Max(0.1, formatted.Height)));
-        if (scale >= 0.999) return formatted;
-
-        // Quantization prevents the text cache from filling with a new key on
-        // every animation frame while a logarithmically spaced note approaches.
-        var fittedSize = Math.Max(1.0, Math.Floor(preferredSize * scale * 2.0) / 2.0);
-        return MakeText(text, fittedSize, brush, weight);
-    }
 
     private FormattedText MakeTextCore(string text, double size, Brush brush, FontWeight? weight,
         Dictionary<(string Text, double Size, Color Color, FontWeight Weight), FormattedText> cache, int limit)

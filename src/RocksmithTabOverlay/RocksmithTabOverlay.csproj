@@ -8,7 +8,7 @@
     <AssemblyName>RocksmithTabOverlay</AssemblyName>
     <RootNamespace>RocksmithTabOverlay</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.2.1</Version>
+    <Version>0.2.2</Version>
     <AssemblyTitle>Rocksmith TAB Overlay</AssemblyTitle>
     <Description>Synchronized tablature overlay for Rocksmith 2014 Remastered</Description>
     <RepositoryUrl>https://github.com/GrzegorzAndrys/rocksmith-tab-overlay</RepositoryUrl>
