@@ -13,6 +13,7 @@ internal static class NativeMethods
     internal const int HotkeyIdBars = 0x52535443;
     internal const int HotkeyIdScaleDown = 0x52535444;
     internal const int HotkeyIdScaleUp = 0x52535445;
+    internal const int HotkeyIdScrollCompression = 0x52535446;
     internal const int WmHotkey = 0x0312;
     internal const int WmNcLButtonDown = 0x00A1;
     internal const int HtBottomRight = 17;

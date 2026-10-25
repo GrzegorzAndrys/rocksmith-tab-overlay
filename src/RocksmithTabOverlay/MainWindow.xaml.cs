@@ -109,6 +109,7 @@ public partial class MainWindow : Window
         NativeMethods.RegisterHotKey(hwnd, NativeMethods.HotkeyIdBars, 0, 0x73); // F4
         NativeMethods.RegisterHotKey(hwnd, NativeMethods.HotkeyIdScaleDown, 0, 0x74); // F5
         NativeMethods.RegisterHotKey(hwnd, NativeMethods.HotkeyIdScaleUp, 0, 0x75); // F6
+        NativeMethods.RegisterHotKey(hwnd, NativeMethods.HotkeyIdScrollCompression, 0, 0x78); // F9
 
         _pollTimer.Tick += OnPollTick;
         _positionTimer.Tick += (_, _) => AttachToRocksmith();
@@ -133,6 +134,7 @@ public partial class MainWindow : Window
         NativeMethods.UnregisterHotKey(hwnd, NativeMethods.HotkeyIdBars);
         NativeMethods.UnregisterHotKey(hwnd, NativeMethods.HotkeyIdScaleDown);
         NativeMethods.UnregisterHotKey(hwnd, NativeMethods.HotkeyIdScaleUp);
+        NativeMethods.UnregisterHotKey(hwnd, NativeMethods.HotkeyIdScrollCompression);
         _source?.RemoveHook(WndProc);
         _http.Dispose();
     }
@@ -173,6 +175,15 @@ public partial class MainWindow : Window
         {
             Tab.ChangeNotationScale(0.1);
             Tab.ShowStatus($"TAB SIZE {Tab.NotationScale:P0}");
+            SaveSettings();
+            Tab.InvalidateVisual();
+            handled = true;
+        }
+        else if (msg == NativeMethods.WmHotkey &&
+                 wParam.ToInt32() == NativeMethods.HotkeyIdScrollCompression)
+        {
+            Tab.CycleScrollCompression();
+            Tab.ShowStatus($"SCROLL CURVE {Tab.ScrollCompressionName}");
             SaveSettings();
             Tab.InvalidateVisual();
             handled = true;
@@ -327,6 +338,7 @@ public partial class MainWindow : Window
         _settings.StaticPageMode = Tab.StaticPageMode;
         _settings.NotationScale = Tab.NotationScale;
         _settings.BarsVisible = Tab.BarsVisible;
+        _settings.ScrollCompressionLevel = Tab.ScrollCompressionLevel;
         _settings.Save();
     }
 

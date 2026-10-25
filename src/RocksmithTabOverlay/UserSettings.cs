@@ -8,6 +8,7 @@ internal sealed class UserSettings
     public bool StaticPageMode { get; set; } = true;
     public double NotationScale { get; set; } = 1.0;
     public int BarsVisible { get; set; } = 4;
+    public int ScrollCompressionLevel { get; set; } = 2;
     public string SnifferUrl { get; set; } = "http://127.0.0.1:9938/tab";
     public bool CustomPlacementEnabled { get; set; }
     public double CustomLeftRatio { get; set; }

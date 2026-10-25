@@ -11,6 +11,8 @@ the game. No chart conversion or duplicate TAB file is required.
 
 - Rolling two-row TAB page (default) and a continuous scrolling view. The current
   row stays on top; the lower preview is promoted when the current row finishes.
+- Adjustable logarithmic scroll compression keeps the next notes spacious while
+  fitting progressively more distant bars into the same view.
 - Lead, Rhythm, and Bass paths, with the live path badge.
 - Chords, colored sustains, fret-to-fret slide slopes, tremolo-picking zigzags,
   bend arrows, H/P legato connectors, vibrato, taps, slap/pop marks, measure
@@ -21,7 +23,7 @@ the game. No chart conversion or duplicate TAB file is required.
 - Automatically hides while Rocksmith is not the foreground window or no
   playable song is active, so a cached previous chart cannot remain on screen.
 - DPI-aware, resolution-independent layout.
-- Remembers mode, bars per row, and notation size.
+- Remembers mode, bars per row, notation size, and scroll-compression strength.
 
 ## Views and layout
 
@@ -30,7 +32,8 @@ then the lower preview is promoted to the top. The playhead always stays on the
 upper row, so the TAB does not disappear underneath it.
 
 Press `F7` for a continuous Songsterr-style view. Notes move through a fixed
-playhead while completed notes dim and correlated misses turn gray.
+playhead while completed notes dim and correlated misses turn gray. Press `F9`
+to cycle linear, light, medium, and strong future-bar compression.
 
 ![Continuous scrolling TAB view during gameplay](docs/scroll-gameplay.png)
 
@@ -83,6 +86,7 @@ cache.
 | `F5` / `F6` | Shrink or enlarge notation (70% to 150%) |
 | `F7` | Toggle two-row TAB page / continuous scroll |
 | `F8` | Show or hide the overlay |
+| `F9` | Cycle linear, light, medium, or strong scroll compression |
 
 The overlay is click-through while locked. Press `F` to enter layout-edit mode,
 drag anywhere on the overlay to move it, drag the highlighted lower-right corner

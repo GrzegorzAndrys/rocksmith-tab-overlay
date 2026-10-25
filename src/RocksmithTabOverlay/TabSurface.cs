@@ -6,6 +6,9 @@ namespace RocksmithTabOverlay;
 
 public sealed class TabSurface : FrameworkElement
 {
+    private static readonly double[] ScrollCompressionStrengths = [0.0, 0.04, 0.08, 0.12];
+    private static readonly string[] ScrollCompressionNames = ["LINEAR", "LIGHT", "MEDIUM", "STRONG"];
+
     private enum NoteVisualState
     {
         Upcoming,
@@ -78,6 +81,8 @@ public sealed class TabSurface : FrameworkElement
     public bool StaticPageMode { get; set; } = true;
     public double NotationScale { get; private set; } = 1.0;
     public int BarsVisible { get; private set; } = 4;
+    public int ScrollCompressionLevel { get; private set; } = 2;
+    public string ScrollCompressionName => ScrollCompressionNames[ScrollCompressionLevel];
     private string _statusMessage = "";
     private DateTime _statusUntilUtc;
 
@@ -86,6 +91,8 @@ public sealed class TabSurface : FrameworkElement
         StaticPageMode = settings.StaticPageMode;
         NotationScale = Math.Round(Math.Clamp(settings.NotationScale, 0.7, 1.5), 1);
         BarsVisible = settings.BarsVisible is 2 or 4 or 6 or 8 ? settings.BarsVisible : 4;
+        ScrollCompressionLevel = Math.Clamp(settings.ScrollCompressionLevel, 0,
+            ScrollCompressionStrengths.Length - 1);
         SetBackgroundOpacity(settings.BackgroundOpacity);
         _textCache.Clear();
         _liveTextCache.Clear();
@@ -118,6 +125,9 @@ public sealed class TabSurface : FrameworkElement
         6 => 8,
         _ => 2
     };
+
+    public void CycleScrollCompression() =>
+        ScrollCompressionLevel = (ScrollCompressionLevel + 1) % ScrollCompressionStrengths.Length;
 
     protected override void OnRender(DrawingContext dc)
     {
@@ -156,8 +166,8 @@ public sealed class TabSurface : FrameworkElement
         else
         {
             var playhead = Math.Max(left + 100, w * 0.31);
-            var rangeStart = SongTime - (playhead - left) / PixelsPerSecond;
-            var rangeEnd = SongTime + (right - playhead) / PixelsPerSecond;
+            var rangeStart = SongTime - ScrollSecondsForDistance(playhead - left);
+            var rangeEnd = SongTime + ScrollSecondsForDistance(right - playhead);
             DrawTabSystem(dc, left, right, 70, h - 22, rangeStart, rangeEnd, true, true);
         }
 
@@ -206,10 +216,8 @@ public sealed class TabSurface : FrameworkElement
         {
             if (measure.Time < rangeStart || measure.Time > rangeEnd) continue;
             var x = scrolling
-                ? playhead + (measure.Time - SongTime) * pixelsPerSecond
-                : playhead + (measure.Time - SongTime) * pixelsPerSecond;
-            if (!scrolling)
-                x = left + (measure.Time - rangeStart) * pixelsPerSecond;
+                ? ScrollTimeToX(measure.Time, playhead)
+                : left + (measure.Time - rangeStart) * pixelsPerSecond;
             x = SnapX(x);
             dc.DrawLine(MeasureLinePen,
                 new Point(x, stringTop - 10), new Point(x, stringBottom + 8));
@@ -237,7 +245,7 @@ public sealed class TabSurface : FrameworkElement
             }
 
             var x = scrolling
-                ? playhead + (note.Time - SongTime) * pixelsPerSecond
+                ? ScrollTimeToX(note.Time, playhead)
                 : left + (note.Time - rangeStart) * pixelsPerSecond;
             x = SnapX(x);
             var noteEndTime = note.Time + Math.Max(0, note.Sustain);
@@ -304,7 +312,9 @@ public sealed class TabSurface : FrameworkElement
 
                 if (note.Sustain > 0.08)
                 {
-                    var endX = Math.Min(right, x + note.Sustain * pixelsPerSecond);
+                    var endX = Math.Min(right, scrolling
+                        ? ScrollTimeToX(noteEndTime, playhead)
+                        : x + note.Sustain * pixelsPerSecond);
                     var sustainPen = state switch
                     {
                         NoteVisualState.Played => PlayedSustainPens[row],
@@ -364,6 +374,26 @@ public sealed class TabSurface : FrameworkElement
             dc.DrawLine(ProgressFillPen,
                 new Point(left, progressY), new Point(playhead, progressY));
         }
+    }
+
+    private double ScrollTimeToX(double time, double playhead)
+    {
+        var seconds = time - SongTime;
+        var strength = ScrollCompressionStrengths[ScrollCompressionLevel];
+        if (strength <= 0)
+            return playhead + seconds * PixelsPerSecond;
+
+        var distance = PixelsPerSecond * Math.Log(1.0 + strength * Math.Abs(seconds)) / strength;
+        return playhead + Math.CopySign(distance, seconds);
+    }
+
+    private double ScrollSecondsForDistance(double pixels)
+    {
+        var linearSeconds = Math.Max(0, pixels) / PixelsPerSecond;
+        var strength = ScrollCompressionStrengths[ScrollCompressionLevel];
+        return strength <= 0
+            ? linearSeconds
+            : (Math.Exp(strength * linearSeconds) - 1.0) / strength;
     }
 
     private void DrawTremolo(DrawingContext dc, double startX, double endX, double y, Pen pen)
@@ -530,14 +560,17 @@ public sealed class TabSurface : FrameworkElement
                 pathPen, new Rect(badgeX - 8, 12, badge.Width + 16, badge.Height + 8), 6, 6);
             dc.DrawText(badge, Snap(new Point(badgeX, 16)));
         }
-        var mode = StaticPageMode ? "TWO ROW TAB" : "SCROLL";
+        var mode = StaticPageMode ? "TWO ROW TAB" : $"SCROLL / {ScrollCompressionName}";
         var zoom = Math.Round(NotationScale * 100);
         var arrangementName = Arrangement == null ? "" :
             string.Equals(Arrangement.Type, Arrangement.Name, StringComparison.OrdinalIgnoreCase)
                 ? Arrangement.Name
                 : $"{Arrangement.Type} / {Arrangement.Name}";
+        var viewDetail = StaticPageMode
+            ? $"{mode}  •  {BarsVisible} BARS/ROW"
+            : $"{mode} COMPRESSION";
         var detail = Arrangement == null ? "waiting for Rocksmith" :
-            $"{arrangementName}  •  {mode}  •  {BarsVisible} BARS/ROW  •  {zoom}%";
+            $"{arrangementName}  •  {viewDetail}  •  {zoom}%";
         DrawText(dc, detail, 11, Brushes.LightGray, new Point(30, 40));
         if (Stats != null && Stats.TotalNotes > 0)
         {
@@ -550,7 +583,7 @@ public sealed class TabSurface : FrameworkElement
                 Brushes.LightCyan, FontWeights.SemiBold);
             dc.DrawText(streak, Snap(new Point(scoreX + hit.Width + miss.Width + 48, 18)));
         }
-        const string controls = "F layout   F4 bars/row   F5/F6 size   F7 mode   F8 hide";
+        const string controls = "F layout   F4 bars/row   F5/F6 size   F7 mode   F8 hide   F9 curve";
         var controlsText = MakeText(controls, 10, ControlsBrush);
         dc.DrawText(controlsText, Snap(new Point(width - controlsText.Width - 28, 41)));
         var timeText = MakeLiveText(FormatTime(SongTime), 13, Brushes.White, FontWeights.SemiBold);
