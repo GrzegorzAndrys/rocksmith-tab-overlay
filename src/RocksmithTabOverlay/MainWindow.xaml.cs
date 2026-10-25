@@ -65,6 +65,7 @@ public partial class MainWindow : Window
     private double _rocksmithClientHeight;
     private IntPtr _rocksmithWindow;
     private bool _rocksmithIsActive;
+    private bool _songReady;
     private bool _layoutKeyWasDown;
     private bool _initializingTransparency = true;
     private HwndSource? _source;
@@ -416,6 +417,15 @@ public partial class MainWindow : Window
                 JsonSerializer.Deserialize<SnifferClockResponse>(json, JsonOptions));
             if (clock?.MemoryReadout == null) return;
 
+            var songId = clock.SongDetails?.SongId ?? "";
+            var songIdentityMatches = !string.IsNullOrWhiteSpace(songId) &&
+                string.Equals(songId, clock.MemoryReadout.SongId, StringComparison.OrdinalIgnoreCase);
+            if (!IsPlayableSongState(clock.CurrentState) || !songIdentityMatches)
+            {
+                ClearActiveSong();
+                return;
+            }
+
             UpdateClock(
                 clock.MemoryReadout.SongTimer,
                 clock.SampleSequence,
@@ -423,9 +433,7 @@ public partial class MainWindow : Window
                 clock.SampleTimestampFrequency);
             Tab.Stats = clock.MemoryReadout.NoteData;
 
-            var songId = clock.SongDetails?.SongId ?? "";
             var arrangementId = clock.MemoryReadout.ArrangementId;
-            if (string.IsNullOrEmpty(songId)) return;
             if (songId == _lastParsedSong && arrangementId == _lastParsedArrangement)
             {
                 UpdatePerformance(songId, arrangementId, clock.MemoryReadout.SongTimer,
@@ -450,14 +458,18 @@ public partial class MainWindow : Window
             {
                 Tab.Song = full.SongDetails;
                 Tab.Arrangement = null;
+                _songReady = false;
                 ResetPerformance("", 0, null);
+                AttachToRocksmith();
                 return;
             }
 
             Tab.Song = full.SongDetails;
             Tab.Arrangement = arrangement;
+            _songReady = true;
             ResetPerformance(songId + "|" + arrangementId, clock.MemoryReadout.SongTimer,
                 clock.MemoryReadout.NoteData);
+            AttachToRocksmith();
         }
         catch (HttpRequestException)
         {
@@ -473,6 +485,30 @@ public partial class MainWindow : Window
         {
             _requestActive = false;
         }
+    }
+
+    private static bool IsPlayableSongState(SnifferState state) => state is
+        SnifferState.SongStarting or
+        SnifferState.SongPlaying or
+        SnifferState.SongEnding;
+
+    private void ClearActiveSong()
+    {
+        if (!_songReady && Tab.Song == null && Tab.Arrangement == null)
+            return;
+
+        _songReady = false;
+        _lastParsedSong = "";
+        _lastParsedArrangement = "";
+        _hasTimer = false;
+        _timerAdvancing = false;
+        Tab.Song = null;
+        Tab.Arrangement = null;
+        Tab.Stats = null;
+        Tab.SongTime = 0;
+        ResetPerformance("", 0, null);
+        Tab.InvalidateVisual();
+        AttachToRocksmith();
     }
 
     private void UpdatePerformance(string songId, string arrangementId, double songTime, NoteData? stats)
@@ -689,7 +725,7 @@ public partial class MainWindow : Window
         var foreground = NativeMethods.GetForegroundWindow();
         NativeMethods.GetWindowThreadProcessId(foreground, out var foregroundProcessId);
         _rocksmithIsActive = foregroundProcessId == process.Id && !NativeMethods.IsIconic(hwnd);
-        var shouldShow = _userVisible && (_rocksmithIsActive || _layoutEditMode);
+        var shouldShow = _userVisible && ((_songReady && _rocksmithIsActive) || _layoutEditMode);
         if (shouldShow && Visibility != Visibility.Visible)
             ResyncClock();
         Visibility = shouldShow ? Visibility.Visible : Visibility.Hidden;

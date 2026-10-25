@@ -18,7 +18,8 @@ the game. No chart conversion or duplicate TAB file is required.
 - Live hit, miss, and streak totals. Finished notes retain a muted string color;
   misses that can be correlated with Rocksmith's live counters turn gray.
 - Click-through, always-on-top overlay that follows the Rocksmith client window.
-- Automatically hides while Rocksmith is not the foreground window.
+- Automatically hides while Rocksmith is not the foreground window or no
+  playable song is active, so a cached previous chart cannot remain on screen.
 - DPI-aware, resolution-independent layout.
 - Remembers mode, bars per row, and notation size.
 

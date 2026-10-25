@@ -2,10 +2,20 @@ using System.Text.Json.Serialization;
 
 namespace RocksmithTabOverlay;
 
+public enum SnifferState
+{
+    None = 0,
+    InMenus = 1,
+    SongSelected = 2,
+    SongStarting = 3,
+    SongPlaying = 4,
+    SongEnding = 5,
+}
+
 public sealed class SnifferResponse
 {
     [JsonPropertyName("success")] public bool Success { get; set; }
-    [JsonPropertyName("currentState")] public int CurrentState { get; set; }
+    [JsonPropertyName("currentState")] public SnifferState CurrentState { get; set; }
     [JsonPropertyName("memoryReadout")] public MemoryReadout? MemoryReadout { get; set; }
     [JsonPropertyName("songDetails")] public SongDetails? SongDetails { get; set; }
 }
@@ -14,6 +24,7 @@ public sealed class SnifferResponse
 // large, unchanging arrangements subtree because it is not represented here.
 public sealed class SnifferClockResponse
 {
+    [JsonPropertyName("currentState")] public SnifferState CurrentState { get; set; }
     [JsonPropertyName("memoryReadout")] public MemoryReadout? MemoryReadout { get; set; }
     [JsonPropertyName("songDetails")] public SongSummary? SongDetails { get; set; }
     [JsonPropertyName("sampleSequence")] public long SampleSequence { get; set; }

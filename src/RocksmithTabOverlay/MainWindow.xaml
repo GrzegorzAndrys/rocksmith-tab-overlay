@@ -8,7 +8,7 @@
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" ShowInTaskbar="False" ShowActivated="False" Topmost="True"
         MouseLeftButtonDown="OnWindowMouseLeftButtonDown">
-    <Grid Background="#01000000">
+    <Grid Background="Transparent">
         <local:TabSurface x:Name="Tab" Margin="12" IsHitTestVisible="False" />
 
         <Border x:Name="EditFrame"
