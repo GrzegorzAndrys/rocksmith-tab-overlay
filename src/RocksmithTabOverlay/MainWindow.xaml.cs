@@ -418,9 +418,14 @@ public partial class MainWindow : Window
             if (clock?.MemoryReadout == null) return;
 
             var songId = clock.SongDetails?.SongId ?? "";
-            var songIdentityMatches = !string.IsNullOrWhiteSpace(songId) &&
-                string.Equals(songId, clock.MemoryReadout.SongId, StringComparison.OrdinalIgnoreCase);
-            if (!IsPlayableSongState(clock.CurrentState) || !songIdentityMatches)
+            var memorySongId = clock.MemoryReadout.SongId;
+            var arrangementId = clock.MemoryReadout.ArrangementId;
+            var songIdentityConflicts = !string.IsNullOrWhiteSpace(memorySongId) &&
+                !string.Equals(songId, memorySongId, StringComparison.OrdinalIgnoreCase);
+            if (!IsPlayableSongState(clock.CurrentState) ||
+                string.IsNullOrWhiteSpace(songId) ||
+                string.IsNullOrWhiteSpace(arrangementId) ||
+                songIdentityConflicts)
             {
                 ClearActiveSong();
                 return;
@@ -433,7 +438,6 @@ public partial class MainWindow : Window
                 clock.SampleTimestampFrequency);
             Tab.Stats = clock.MemoryReadout.NoteData;
 
-            var arrangementId = clock.MemoryReadout.ArrangementId;
             if (songId == _lastParsedSong && arrangementId == _lastParsedArrangement)
             {
                 UpdatePerformance(songId, arrangementId, clock.MemoryReadout.SongTimer,

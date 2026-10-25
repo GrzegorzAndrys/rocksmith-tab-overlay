@@ -46,7 +46,7 @@ namespace RockSniffer.Addons
         private long memorySampleTimestamp;
 
         //Cache the response
-        private JsonResponse jsResp = new JsonResponse();
+        private volatile JsonResponse jsResp = new JsonResponse();
         private readonly AddonSettings settings;
         private readonly IAddonStorage storage;
 
@@ -82,6 +82,15 @@ namespace RockSniffer.Addons
         internal void OnStateChanged(object sender, OnStateChangedArgs args)
         {
             jsResp.currentState = args.newState;
+        }
+
+        internal void ClearState()
+        {
+            memReadout = new RSMemoryReadout();
+            songDetails = new SongDetails();
+            jsResp = new JsonResponse();
+            Interlocked.Exchange(ref memorySampleSequence, 0);
+            Interlocked.Exchange(ref memorySampleTimestamp, 0);
         }
 
         private void Listen()

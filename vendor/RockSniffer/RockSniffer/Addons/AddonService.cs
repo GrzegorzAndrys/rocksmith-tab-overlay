@@ -76,9 +76,15 @@ var port = {settings.port};
 
         public void SetSniffer(Sniffer sniffer)
         {
+            listener.ClearState();
             sniffer.OnSongChanged += listener.OnCurrentSongChanged;
             sniffer.OnMemoryReadout += listener.OnMemoryReadout;
             sniffer.OnStateChanged += listener.OnStateChanged;
+        }
+
+        public void ClearState()
+        {
+            listener.ClearState();
         }
     }
 }

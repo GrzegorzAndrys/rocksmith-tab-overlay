@@ -198,6 +198,10 @@ namespace RockSniffer
 
         public void Run()
         {
+            // Never keep serving the last game's song while waiting to attach to a
+            // new Rocksmith process. Consumers should see an empty/not-ready state.
+            addonService?.ClearState();
+
             //Clear output / create output files
             ClearOutput();
 
@@ -254,9 +258,12 @@ namespace RockSniffer
             if (!rocksmithEditionHashes.ContainsKey(hash))
             {
                 Logger.LogError("Executable hash does not match expected hash, make sure you have the correct version");
-                Logger.Log("Press any key to exit");
-                Console.ReadKey();
-                Environment.Exit(0);
+                Logger.Log("Rocksmith may still be applying a launch-time patch; retrying detection in 3 seconds");
+                addonService?.ClearState();
+                rsProcess.Dispose();
+                rsProcess = null;
+                Thread.Sleep(3000);
+                return;
             }
             
             var edition = rocksmithEditionHashes[hash];
