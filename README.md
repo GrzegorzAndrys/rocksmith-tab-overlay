@@ -5,7 +5,7 @@ It reads the active arrangement from the installed `.psarc`, follows Rocksmith's
 live song clock through a patched RockSniffer server, and draws ordinary TAB over
 the game. No chart conversion or duplicate TAB file is required.
 
-![Two-row TAB overlay showing four bars per row](docs/screenshot.png)
+![Rocksmith TAB Overlay running over Don't Fear the Reaper in two-row mode](docs/two-row-gameplay.png)
 
 ## Features
 
@@ -21,6 +21,23 @@ the game. No chart conversion or duplicate TAB file is required.
 - Automatically hides while Rocksmith is not the foreground window.
 - DPI-aware, resolution-independent layout.
 - Remembers mode, bars per row, and notation size.
+
+## Views and layout
+
+The default two-row view behaves like a rolling page: play through the upper row,
+then the lower preview is promoted to the top. The playhead always stays on the
+upper row, so the TAB does not disappear underneath it.
+
+Press `F7` for a continuous Songsterr-style view. Notes move through a fixed
+playhead while completed notes dim and correlated misses turn gray.
+
+![Continuous scrolling TAB view during gameplay](docs/scroll-gameplay.png)
+
+Press `F` to unlock the overlay. You can drag it, resize it from the lower-right
+corner, and separately change the dark background and whole-TAB opacity. Press
+`F` again to save the layout and make the overlay click-through.
+
+![Unlocked overlay showing move, resize, and opacity controls](docs/layout-edit.png)
 
 ## Requirements
 
