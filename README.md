@@ -59,13 +59,17 @@ cache.
 
 | Key | Action |
 | --- | --- |
+| `F` | Unlock/lock layout editing; drag the overlay and resize it from the highlighted corner |
 | `F4` | Cycle 2, 4, 6, or 8 bars per row |
 | `F5` / `F6` | Shrink or enlarge notation (70% to 150%) |
 | `F7` | Toggle two-row TAB page / continuous scroll |
 | `F8` | Show or hide the overlay |
 
-The overlay is click-through. Use the game's normal window controls to move or
-resize Rocksmith; the overlay follows the game's client area.
+The overlay is click-through while locked. Press `F` to enter layout-edit mode,
+drag anywhere on the overlay to move it, drag the highlighted lower-right corner
+to resize it, then press `F` again to save and return to click-through mode.
+Custom bounds are stored relative to Rocksmith's client area, so the placement
+scales sensibly when the game resolution or Windows DPI changes.
 
 ## Display and refresh-rate behavior
 
@@ -101,8 +105,9 @@ Preferences are stored at:
 %LOCALAPPDATA%\RocksmithTabOverlay\user-settings.json
 ```
 
-Older builds stored `user-settings.json` next to the executable. That file is
-read once and migrated automatically.
+This includes the view controls and optional custom overlay position/size. Older
+builds stored `user-settings.json` next to the executable. That file is read once
+and migrated automatically.
 
 ## Build from source
 

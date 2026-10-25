@@ -9,6 +9,11 @@ internal sealed class UserSettings
     public double NotationScale { get; set; } = 1.0;
     public int BarsVisible { get; set; } = 4;
     public string SnifferUrl { get; set; } = "http://127.0.0.1:9938/tab";
+    public bool CustomPlacementEnabled { get; set; }
+    public double CustomLeftRatio { get; set; }
+    public double CustomTopRatio { get; set; } = 0.012;
+    public double CustomWidthRatio { get; set; } = 1.0;
+    public double CustomHeightRatio { get; set; } = 0.47;
 
     private static string SettingsDirectory => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),

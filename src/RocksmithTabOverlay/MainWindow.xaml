@@ -4,7 +4,37 @@
         xmlns:local="clr-namespace:RocksmithTabOverlay"
         Title="Rocksmith TAB Overlay"
         Width="1200" Height="390"
+        MinWidth="500" MinHeight="250"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
-        ResizeMode="NoResize" ShowInTaskbar="False" ShowActivated="False" Topmost="True">
-    <local:TabSurface x:Name="Tab" Margin="12" />
+        ResizeMode="NoResize" ShowInTaskbar="False" ShowActivated="False" Topmost="True"
+        MouseLeftButtonDown="OnWindowMouseLeftButtonDown">
+    <Grid>
+        <local:TabSurface x:Name="Tab" Margin="12" IsHitTestVisible="False" />
+
+        <Border x:Name="EditFrame"
+                Margin="4" BorderThickness="2" CornerRadius="12"
+                BorderBrush="#FF48D6FF" Background="#1800BFEF"
+                IsHitTestVisible="False" Visibility="Collapsed" />
+
+        <Border x:Name="EditHint"
+                HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,7,0,0"
+                Padding="14,6" CornerRadius="7"
+                Background="#EF121820" BorderBrush="#FF48D6FF" BorderThickness="1"
+                IsHitTestVisible="False" Visibility="Collapsed">
+            <TextBlock Text="DRAG TO MOVE   •   DRAG CORNER TO RESIZE   •   F TO LOCK"
+                       Foreground="White" FontFamily="Consolas" FontSize="12"
+                       FontWeight="SemiBold" />
+        </Border>
+
+        <Border x:Name="ResizeGrip"
+                Width="34" Height="34" Margin="0,0,7,7"
+                HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                Background="#EF121820" BorderBrush="#FF48D6FF" BorderThickness="1"
+                CornerRadius="6" Cursor="SizeNWSE"
+                MouseLeftButtonDown="OnResizeGripMouseLeftButtonDown"
+                Visibility="Collapsed">
+            <TextBlock Text="◢" Foreground="#FF48D6FF" FontSize="20"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </Border>
+    </Grid>
 </Window>

@@ -542,7 +542,7 @@ public sealed class TabSurface : FrameworkElement
                 Brushes.LightCyan, FontWeights.SemiBold);
             dc.DrawText(streak, Snap(new Point(scoreX + hit.Width + miss.Width + 48, 18)));
         }
-        const string controls = "F4 bars/row   F5/F6 size   F7 mode   F8 hide";
+        const string controls = "F layout   F4 bars/row   F5/F6 size   F7 mode   F8 hide";
         var controlsText = MakeText(controls, 10, ControlsBrush);
         dc.DrawText(controlsText, Snap(new Point(width - controlsText.Width - 28, 41)));
         var timeText = MakeLiveText(FormatTime(SongTime), 13, Brushes.White, FontWeights.SemiBold);

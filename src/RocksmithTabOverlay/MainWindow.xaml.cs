@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net.Http;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -57,6 +58,14 @@ public partial class MainWindow : Window
     private int _lastTotalMisses;
     private double _lastPerformanceTime;
     private bool _hasPerformanceBaseline;
+    private bool _layoutEditMode;
+    private double _rocksmithClientLeft;
+    private double _rocksmithClientTop;
+    private double _rocksmithClientWidth;
+    private double _rocksmithClientHeight;
+    private IntPtr _rocksmithWindow;
+    private bool _rocksmithIsActive;
+    private bool _layoutKeyWasDown;
     private HwndSource? _source;
 
     private string SnifferUrl
@@ -83,12 +92,9 @@ public partial class MainWindow : Window
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         var hwnd = new WindowInteropHelper(this).Handle;
-        var style = NativeMethods.GetWindowLongPtr(hwnd, NativeMethods.GwlExStyle).ToInt64();
-        NativeMethods.SetWindowLongPtr(hwnd, NativeMethods.GwlExStyle,
-            new IntPtr(style | NativeMethods.WsExTransparent | NativeMethods.WsExNoActivate | NativeMethods.WsExToolWindow));
-
         _source = HwndSource.FromHwnd(hwnd);
         _source?.AddHook(WndProc);
+        ApplyInteractionMode();
         NativeMethods.RegisterHotKey(hwnd, NativeMethods.HotkeyIdToggle, 0, 0x77); // F8
         NativeMethods.RegisterHotKey(hwnd, NativeMethods.HotkeyIdMode, 0, 0x76); // F7
         NativeMethods.RegisterHotKey(hwnd, NativeMethods.HotkeyIdBars, 0, 0x73); // F4
@@ -163,6 +169,92 @@ public partial class MainWindow : Window
         return IntPtr.Zero;
     }
 
+    private void ToggleLayoutEditMode()
+    {
+        if (_layoutEditMode)
+        {
+            SaveCustomPlacement();
+            _layoutEditMode = false;
+            ApplyInteractionMode();
+            Tab.ShowStatus("LAYOUT LOCKED");
+            if (_rocksmithWindow != IntPtr.Zero)
+                NativeMethods.SetForegroundWindow(_rocksmithWindow);
+            AttachToRocksmith();
+            return;
+        }
+
+        // The current automatic bounds are a useful starting point the first time
+        // edit mode is opened. From then on, placement is stored relative to the
+        // Rocksmith client so it survives monitor resolution and DPI changes.
+        _layoutEditMode = true;
+        _settings.CustomPlacementEnabled = true;
+        SaveCustomPlacement();
+        ApplyInteractionMode();
+        Visibility = Visibility.Visible;
+        Activate();
+        Tab.ShowStatus("LAYOUT EDIT — DRAG, RESIZE, F TO LOCK");
+    }
+
+    private void ApplyInteractionMode()
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero) return;
+
+        var style = NativeMethods.GetWindowLongPtr(hwnd, NativeMethods.GwlExStyle).ToInt64();
+        style |= NativeMethods.WsExToolWindow;
+        if (_layoutEditMode)
+            style &= ~(NativeMethods.WsExTransparent | NativeMethods.WsExNoActivate);
+        else
+            style |= NativeMethods.WsExTransparent | NativeMethods.WsExNoActivate;
+
+        NativeMethods.SetWindowLongPtr(hwnd, NativeMethods.GwlExStyle, new IntPtr(style));
+        NativeMethods.SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0,
+            NativeMethods.SwpNoMove | NativeMethods.SwpNoSize | NativeMethods.SwpNoZOrder |
+            NativeMethods.SwpNoActivate | NativeMethods.SwpFrameChanged);
+
+        ResizeMode = _layoutEditMode ? ResizeMode.CanResize : ResizeMode.NoResize;
+        EditFrame.Visibility = _layoutEditMode ? Visibility.Visible : Visibility.Collapsed;
+        EditHint.Visibility = _layoutEditMode ? Visibility.Visible : Visibility.Collapsed;
+        ResizeGrip.Visibility = _layoutEditMode ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void OnWindowMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (!_layoutEditMode || ResizeGrip.IsMouseOver || e.ChangedButton != MouseButton.Left) return;
+        try
+        {
+            DragMove();
+            SaveCustomPlacement();
+        }
+        catch (InvalidOperationException)
+        {
+            // The native move loop may already have consumed the button-up event.
+        }
+    }
+
+    private void OnResizeGripMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (!_layoutEditMode || e.ChangedButton != MouseButton.Left) return;
+        e.Handled = true;
+        var hwnd = new WindowInteropHelper(this).Handle;
+        NativeMethods.ReleaseCapture();
+        NativeMethods.SendMessage(hwnd, NativeMethods.WmNcLButtonDown,
+            new IntPtr(NativeMethods.HtBottomRight), IntPtr.Zero);
+        SaveCustomPlacement();
+    }
+
+    private void SaveCustomPlacement()
+    {
+        if (!_settings.CustomPlacementEnabled || _rocksmithClientWidth < 1 || _rocksmithClientHeight < 1)
+            return;
+
+        _settings.CustomLeftRatio = (Left - _rocksmithClientLeft) / _rocksmithClientWidth;
+        _settings.CustomTopRatio = (Top - _rocksmithClientTop) / _rocksmithClientHeight;
+        _settings.CustomWidthRatio = Math.Clamp(Width / _rocksmithClientWidth, 0.20, 2.0);
+        _settings.CustomHeightRatio = Math.Clamp(Height / _rocksmithClientHeight, 0.15, 1.5);
+        _settings.Save();
+    }
+
     private void SaveSettings()
     {
         _settings.StaticPageMode = Tab.StaticPageMode;
@@ -179,6 +271,7 @@ public partial class MainWindow : Window
 
     private void OnRendering(object? sender, EventArgs e)
     {
+        ObserveLayoutKey();
         var now = _clock.Elapsed.TotalSeconds;
         var elapsed = Math.Clamp(now - _lastFrameAt, 0, 0.25);
         _lastFrameAt = now;
@@ -193,6 +286,17 @@ public partial class MainWindow : Window
         // rate: every frame uses the interpolated monotonic clock, while fresh
         // samples only correct drift.
         Tab.InvalidateVisual();
+    }
+
+    private void ObserveLayoutKey()
+    {
+        // Do not reserve the plain F key as a system-wide hotkey: that would make
+        // it unusable in other applications while Rocksmith is open. Poll its edge
+        // only while the game is active (or while edit mode itself has focus).
+        var keyDown = (NativeMethods.GetAsyncKeyState(0x46) & 0x8000) != 0;
+        if (keyDown && !_layoutKeyWasDown && ((_rocksmithIsActive && _userVisible) || _layoutEditMode))
+            ToggleLayoutEditMode();
+        _layoutKeyWasDown = keyDown;
     }
 
     private void AdvanceClock(double now, double elapsed)
@@ -509,18 +613,21 @@ public partial class MainWindow : Window
         var process = Process.GetProcessesByName("Rocksmith2014").FirstOrDefault(p => p.MainWindowHandle != IntPtr.Zero);
         if (process == null)
         {
+            _rocksmithWindow = IntPtr.Zero;
+            _rocksmithIsActive = false;
             Visibility = Visibility.Hidden;
             return;
         }
         var hwnd = process.MainWindowHandle;
+        _rocksmithWindow = hwnd;
         var foreground = NativeMethods.GetForegroundWindow();
         NativeMethods.GetWindowThreadProcessId(foreground, out var foregroundProcessId);
-        var rocksmithIsActive = foregroundProcessId == process.Id && !NativeMethods.IsIconic(hwnd);
-        var shouldShow = _userVisible && rocksmithIsActive;
+        _rocksmithIsActive = foregroundProcessId == process.Id && !NativeMethods.IsIconic(hwnd);
+        var shouldShow = _userVisible && (_rocksmithIsActive || _layoutEditMode);
         if (shouldShow && Visibility != Visibility.Visible)
             ResyncClock();
         Visibility = shouldShow ? Visibility.Visible : Visibility.Hidden;
-        if (!rocksmithIsActive) return;
+        if (!_rocksmithIsActive && !_layoutEditMode) return;
         if (!NativeMethods.GetClientRect(hwnd, out var rect)) return;
         var origin = new NativeMethods.Point();
         if (!NativeMethods.ClientToScreen(hwnd, ref origin)) return;
@@ -537,13 +644,34 @@ public partial class MainWindow : Window
         var fromDevice = source.CompositionTarget.TransformFromDevice;
         var clientWidth = width * fromDevice.M11;
         var clientHeight = height * fromDevice.M22;
+        _rocksmithClientLeft = origin.X * fromDevice.M11;
+        _rocksmithClientTop = origin.Y * fromDevice.M22;
+        _rocksmithClientWidth = clientWidth;
+        _rocksmithClientHeight = clientHeight;
+
+        // Never fight the user's mouse while the native move/resize loop is active.
+        // The final rectangle is saved when the gesture ends.
+        if (_layoutEditMode) return;
+
+        if (_settings.CustomPlacementEnabled)
+        {
+            var customWidth = Math.Clamp(clientWidth * _settings.CustomWidthRatio,
+                MinWidth, Math.Max(MinWidth, clientWidth * 2.0));
+            var customHeight = Math.Clamp(clientHeight * _settings.CustomHeightRatio,
+                MinHeight, Math.Max(MinHeight, clientHeight * 1.5));
+            Left = _rocksmithClientLeft + clientWidth * _settings.CustomLeftRatio;
+            Top = _rocksmithClientTop + clientHeight * _settings.CustomTopRatio;
+            Width = customWidth;
+            Height = customHeight;
+            return;
+        }
+
         var topOffset = 12.0;
         var overlayHeight = Math.Min(
             Math.Clamp(clientHeight * 0.47, 320.0, 680.0),
             Math.Max(200.0, clientHeight - topOffset));
-        var overlayOrigin = new System.Windows.Point(origin.X * fromDevice.M11, origin.Y * fromDevice.M22 + topOffset);
-        Left = overlayOrigin.X;
-        Top = overlayOrigin.Y;
+        Left = _rocksmithClientLeft;
+        Top = _rocksmithClientTop + topOffset;
         Width = Math.Max(1, clientWidth);
         Height = Math.Max(1, overlayHeight);
     }
