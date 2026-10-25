@@ -46,12 +46,12 @@ New-Item -ItemType Directory -Path $snifferOut, $overlayOut -Force | Out-Null
 
 & $dotnetPath publish (Join-Path $root 'vendor\RockSniffer\RockSniffer\RockSniffer.csproj') `
     -c Release -r win-x64 --self-contained $selfContainedValue -o $snifferOut -m:1 `
-    -p:DebugType=None -p:DebugSymbols=false
+    -p:DebugType=None -p:DebugSymbols=false -p:NuGetAudit=false
 if ($LASTEXITCODE -ne 0) { throw 'RockSniffer build failed' }
 
 & $dotnetPath publish $projectPath `
     -c Release -r win-x64 --self-contained $selfContainedValue -o $overlayOut -m:1 `
-    -p:DebugType=None -p:DebugSymbols=false
+    -p:DebugType=None -p:DebugSymbols=false -p:NuGetAudit=false
 if ($LASTEXITCODE -ne 0) { throw 'Overlay build failed' }
 
 Copy-Item -LiteralPath (Join-Path $root 'vendor\RockSniffer\addons') -Destination $snifferOut -Recurse -Force

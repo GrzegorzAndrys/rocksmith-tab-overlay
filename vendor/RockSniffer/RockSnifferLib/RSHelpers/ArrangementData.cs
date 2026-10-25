@@ -9,6 +9,7 @@ namespace RockSnifferLib.RSHelpers
     [Serializable]
     public class ArrangementData
     {
+        private const uint NoteMaskTremolo = 0x0010;
         private const uint NoteMaskHammerOn = 0x0200;
         private const uint NoteMaskPullOff = 0x0400;
 
@@ -22,7 +23,10 @@ namespace RockSnifferLib.RSHelpers
             public string Technique { get; set; } = "";
             public bool HammerOn { get; set; }
             public bool PullOff { get; set; }
+            public bool Tremolo { get; set; }
             public float Bend { get; set; }
+            public int SlideTo { get; set; } = -1;
+            public int SlideUnpitchTo { get; set; } = -1;
         }
 
         public class Measure
@@ -105,7 +109,10 @@ namespace RockSnifferLib.RSHelpers
                         Technique = DescribeTechnique(note),
                         HammerOn = (note.NoteMask & NoteMaskHammerOn) != 0,
                         PullOff = (note.NoteMask & NoteMaskPullOff) != 0,
-                        Bend = note.MaxBend
+                        Tremolo = (note.NoteMask & NoteMaskTremolo) != 0,
+                        Bend = note.MaxBend,
+                        SlideTo = DecodeSlideFret(note.SlideTo),
+                        SlideUnpitchTo = DecodeSlideFret(note.SlideUnpitchTo)
                     };
 
                     if (note.ChordId >= 0 && note.ChordId < sng.Chords.Length)
@@ -134,11 +141,11 @@ namespace RockSnifferLib.RSHelpers
             return fret;
         }
 
+        private static int DecodeSlideFret(byte fret) => fret == byte.MaxValue ? -1 : fret;
+
         private static string DescribeTechnique(Note note)
         {
             var parts = new List<string>();
-            if (note.SlideTo != 255 && note.SlideTo > 0) parts.Add("/" + note.SlideTo);
-            if (note.SlideUnpitchTo != 255 && note.SlideUnpitchTo > 0) parts.Add("\\" + note.SlideUnpitchTo);
             if (note.Vibrato > 0) parts.Add("~");
             // These byte fields use 255 as their "not authored" sentinel.
             if (note.Tap != 255 && note.Tap > 0) parts.Add("T");

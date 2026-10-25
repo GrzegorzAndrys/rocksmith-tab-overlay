@@ -13,7 +13,8 @@ Local changes:
 - Added a lightweight `GET /tab` endpoint that omits album art from the
   high-frequency response and includes monotonic memory-sample timestamps.
 - Added `ArrangementData.TabEvents` and per-phrase maximum-difficulty note
-  merging, including structured bends, hammer-ons, and pull-offs.
+  merging, including structured bends, hammer-ons, pull-offs, tremolo picking,
+  and pitched/unpitched slide destinations.
 - Versioned parsed arrangement caches so notation additions trigger a one-time
   safe rebuild instead of leaving stale chart data in place.
 - Added arrangement-ID cache lookup for the short window where Rocksmith

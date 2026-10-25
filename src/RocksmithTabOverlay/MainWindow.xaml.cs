@@ -18,6 +18,8 @@ public partial class MainWindow : Window
     private const double MaxLargeDriftRate = 0.20;
     private const double MinPlaybackRate = 0.05;
     private const double MaxPlaybackRate = 1.50;
+    private const double JudgementLookAheadSeconds = 0.10;
+    private const double JudgementStaleSeconds = 0.65;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -47,6 +49,14 @@ public partial class MainWindow : Window
     private bool _timerAdvancing;
     private string _lastParsedSong = "";
     private string _lastParsedArrangement = "";
+    private readonly Queue<int> _pendingPerformanceEvents = new();
+    private readonly HashSet<int> _missedEvents = new();
+    private string _performanceKey = "";
+    private int _performanceCursor;
+    private int _lastTotalHits;
+    private int _lastTotalMisses;
+    private double _lastPerformanceTime;
+    private bool _hasPerformanceBaseline;
     private HwndSource? _source;
 
     private string SnifferUrl
@@ -65,6 +75,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         Tab.ApplySettings(_settings);
+        Tab.MissedEvents = _missedEvents;
         Loaded += OnLoaded;
         Closed += OnClosed;
     }
@@ -245,7 +256,12 @@ public partial class MainWindow : Window
             var songId = clock.SongDetails?.SongId ?? "";
             var arrangementId = clock.MemoryReadout.ArrangementId;
             if (string.IsNullOrEmpty(songId)) return;
-            if (songId == _lastParsedSong && arrangementId == _lastParsedArrangement) return;
+            if (songId == _lastParsedSong && arrangementId == _lastParsedArrangement)
+            {
+                UpdatePerformance(songId, arrangementId, clock.MemoryReadout.SongTimer,
+                    clock.MemoryReadout.NoteData);
+                return;
+            }
 
             var full = await Task.Run(() =>
                 JsonSerializer.Deserialize<SnifferResponse>(json, JsonOptions));
@@ -264,11 +280,14 @@ public partial class MainWindow : Window
             {
                 Tab.Song = full.SongDetails;
                 Tab.Arrangement = null;
+                ResetPerformance("", 0, null);
                 return;
             }
 
             Tab.Song = full.SongDetails;
             Tab.Arrangement = arrangement;
+            ResetPerformance(songId + "|" + arrangementId, clock.MemoryReadout.SongTimer,
+                clock.MemoryReadout.NoteData);
         }
         catch (HttpRequestException)
         {
@@ -284,6 +303,86 @@ public partial class MainWindow : Window
         {
             _requestActive = false;
         }
+    }
+
+    private void UpdatePerformance(string songId, string arrangementId, double songTime, NoteData? stats)
+    {
+        var key = songId + "|" + arrangementId;
+        var events = Tab.Arrangement?.Data?.TabEvents;
+        if (events == null || !string.Equals(key, _performanceKey, StringComparison.Ordinal))
+        {
+            ResetPerformance(key, songTime, stats);
+            return;
+        }
+
+        if (!_hasPerformanceBaseline || stats == null)
+        {
+            ResetPerformance(key, songTime, stats);
+            return;
+        }
+
+        // Restarting a song/Riff Repeater phrase can rewind the clock without the
+        // counters resetting on the exact same sample. Treat either signal as a new
+        // pass so results from the previous run never stain the new one.
+        if (songTime < _lastPerformanceTime - 0.25 ||
+            stats.TotalNotesHit < _lastTotalHits || stats.TotalNotesMissed < _lastTotalMisses)
+        {
+            ResetPerformance(key, songTime, stats);
+            return;
+        }
+
+        while (_performanceCursor < events.Count &&
+               events[_performanceCursor].Time <= songTime + JudgementLookAheadSeconds)
+        {
+            _pendingPerformanceEvents.Enqueue(_performanceCursor);
+            _performanceCursor++;
+        }
+
+        var hitDelta = Math.Max(0, stats.TotalNotesHit - _lastTotalHits);
+        var missDelta = Math.Max(0, stats.TotalNotesMissed - _lastTotalMisses);
+        var resultCount = hitDelta + missDelta;
+        var assignCount = Math.Min(resultCount, _pendingPerformanceEvents.Count);
+
+        // Rocksmith exposes aggregate counters rather than a per-note result. Polling
+        // at 70 ms normally yields one result at a time. If several land together,
+        // consume them chronologically and put misses at the end of that tiny batch;
+        // this avoids inventing misses when the mapping is ambiguous.
+        var missesToAssign = Math.Min(missDelta, assignCount);
+        var firstMiss = assignCount - missesToAssign;
+        for (var i = 0; i < assignCount; i++)
+        {
+            var eventIndex = _pendingPerformanceEvents.Dequeue();
+            if (i >= firstMiss)
+                _missedEvents.Add(eventIndex);
+        }
+
+        // At reduced dynamic difficulty the full TAB can contain authored notes that
+        // Rocksmith never judges. Let those expire instead of shifting later results.
+        while (_pendingPerformanceEvents.Count > 0 &&
+               events[_pendingPerformanceEvents.Peek()].Time < songTime - JudgementStaleSeconds)
+            _pendingPerformanceEvents.Dequeue();
+
+        _lastTotalHits = stats.TotalNotesHit;
+        _lastTotalMisses = stats.TotalNotesMissed;
+        _lastPerformanceTime = songTime;
+    }
+
+    private void ResetPerformance(string key, double songTime, NoteData? stats)
+    {
+        _performanceKey = key;
+        _performanceCursor = 0;
+        _pendingPerformanceEvents.Clear();
+        _missedEvents.Clear();
+        _lastPerformanceTime = songTime;
+        _lastTotalHits = stats?.TotalNotesHit ?? 0;
+        _lastTotalMisses = stats?.TotalNotesMissed ?? 0;
+        _hasPerformanceBaseline = stats != null;
+
+        var events = Tab.Arrangement?.Data?.TabEvents;
+        if (events == null) return;
+        while (_performanceCursor < events.Count &&
+               events[_performanceCursor].Time <= songTime + JudgementLookAheadSeconds)
+            _performanceCursor++;
     }
 
     private void UpdateClock(double incomingTime, long sampleSequence, long sampleTimestamp,

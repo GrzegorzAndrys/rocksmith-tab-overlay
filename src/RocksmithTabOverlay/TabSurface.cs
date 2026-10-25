@@ -6,6 +6,13 @@ namespace RocksmithTabOverlay;
 
 public sealed class TabSurface : FrameworkElement
 {
+    private enum NoteVisualState
+    {
+        Upcoming,
+        Played,
+        Missed
+    }
+
     private static readonly string[] StringNames = ["E", "B", "G", "D", "A", "E"];
     private static readonly string[] FretLabels = BuildFretLabels();
     private static readonly Brush[] StringBrushes =
@@ -35,11 +42,15 @@ public sealed class TabSurface : FrameworkElement
     private static readonly Pen StringLinePen = PenFrom(BrushFrom(175, 190, 195, 205), 1.25);
     private static readonly Pen MeasureLinePen = PenFrom(BrushFrom(72, 255, 255, 255), 1);
     private static readonly Brush NoteFill = BrushFrom(235, 12, 14, 18);
+    private static readonly Brush PlayedNoteFill = BrushFrom(175, 12, 14, 18);
     private static readonly Brush PastNoteFill = BrushFrom(120, 12, 14, 18);
     private static readonly Brush PastLabelBrush = BrushFrom(135, 175, 180, 188);
+    private static readonly Brush[] PlayedStringBrushes = CreateStringBrushes(145);
     private static readonly Pen[] ActiveNotePens = CreateStringPens(255, 2);
+    private static readonly Pen[] PlayedNotePens = CreateStringPens(145, 1.4);
     private static readonly Pen PastNotePen = PenFrom(PastLabelBrush, 1);
     private static readonly Pen[] ActiveSustainPens = CreateStringPens(170, 2);
+    private static readonly Pen[] PlayedSustainPens = CreateStringPens(105, 1.6);
     private static readonly Pen PastSustainPen = PenFrom(BrushFrom(70, 175, 180, 188), 2);
     private static readonly Pen PlayheadPen = PenFrom(BrushFrom(235, 255, 255, 255), 2);
     private static readonly Pen ProgressTrackPen = PenFrom(BrushFrom(90, 255, 255, 255), 2);
@@ -61,6 +72,7 @@ public sealed class TabSurface : FrameworkElement
     public SongDetails? Song { get; set; }
     public ArrangementDetails? Arrangement { get; set; }
     public NoteData? Stats { get; set; }
+    public IReadOnlySet<int> MissedEvents { get; set; } = new HashSet<int>();
     public double SongTime { get; set; }
     public double PixelsPerSecond { get; set; } = 145;
     public bool StaticPageMode { get; set; } = true;
@@ -200,8 +212,9 @@ public sealed class TabSurface : FrameworkElement
         var previousNoteX = Enumerable.Repeat(double.NaN, 6).ToArray();
         var previousNoteRadius = new double[6];
 
-        foreach (var note in Arrangement.Data.TabEvents)
+        for (var noteIndex = 0; noteIndex < Arrangement.Data.TabEvents.Count; noteIndex++)
         {
+            var note = Arrangement.Data.TabEvents[noteIndex];
             // In scrolling mode a little tolerance lets notes slide in and out at
             // the edges. In the two-row page the next row starts exactly at
             // rangeEnd, so including that boundary note would draw a clipped
@@ -219,7 +232,14 @@ public sealed class TabSurface : FrameworkElement
                 ? playhead + (note.Time - SongTime) * pixelsPerSecond
                 : left + (note.Time - rangeStart) * pixelsPerSecond;
             x = SnapX(x);
-            var past = note.Time < SongTime - 0.04;
+            var noteEndTime = note.Time + Math.Max(0, note.Sustain);
+            var completed = note.Sustain > 0.08
+                ? noteEndTime < SongTime - 0.04
+                : note.Time < SongTime - 0.04;
+            var missed = note.Time < SongTime - 0.04 && MissedEvents.Contains(noteIndex);
+            var state = missed
+                ? NoteVisualState.Missed
+                : completed ? NoteVisualState.Played : NoteVisualState.Upcoming;
             var chordTop = double.MaxValue;
 
             for (var stringIndex = 0; stringIndex < Math.Min(6, note.Frets.Length); stringIndex++)
@@ -243,35 +263,73 @@ public sealed class TabSurface : FrameworkElement
                 {
                     if (!double.IsNaN(previousNoteX[stringIndex]))
                         DrawLegatoConnector(dc, previousNoteX[stringIndex], previousNoteRadius[stringIndex],
-                            x, radius, y, regionTop, legato, past);
+                            x, radius, y, regionTop, legato, state != NoteVisualState.Upcoming);
                     else
                         DrawTechniqueBadge(dc, legato, x, Math.Max(regionTop + 4, y - 35 * NotationScale),
-                            LegatoBrush, past);
+                            LegatoBrush, state != NoteVisualState.Upcoming);
                 }
 
-                dc.DrawEllipse(past ? PastNoteFill : NoteFill,
-                    past ? PastNotePen : ActiveNotePens[row],
+                var noteFill = state switch
+                {
+                    NoteVisualState.Played => PlayedNoteFill,
+                    NoteVisualState.Missed => PastNoteFill,
+                    _ => NoteFill
+                };
+                var notePen = state switch
+                {
+                    NoteVisualState.Played => PlayedNotePens[row],
+                    NoteVisualState.Missed => PastNotePen,
+                    _ => ActiveNotePens[row]
+                };
+                var labelBrush = state switch
+                {
+                    NoteVisualState.Played => PlayedStringBrushes[row],
+                    NoteVisualState.Missed => PastLabelBrush,
+                    _ => StringBrushes[row]
+                };
+
+                dc.DrawEllipse(noteFill, notePen,
                     new Point(x, y), radius, 18.5 * NotationScale);
                 var ft = MakeText(label, 23 * NotationScale,
-                    past ? PastLabelBrush : StringBrushes[row], FontWeights.Bold);
+                    labelBrush, FontWeights.Bold);
                 dc.DrawText(ft, Snap(new Point(x - ft.Width / 2, y - ft.Height / 2)));
 
                 if (note.Sustain > 0.08)
                 {
                     var endX = Math.Min(right, x + note.Sustain * pixelsPerSecond);
-                    dc.DrawLine(past ? PastSustainPen : ActiveSustainPens[row],
-                        new Point(x + radius, y), new Point(endX, y));
+                    var sustainPen = state switch
+                    {
+                        NoteVisualState.Played => PlayedSustainPens[row],
+                        NoteVisualState.Missed => PastSustainPen,
+                        _ => ActiveSustainPens[row]
+                    };
+                    var slideTarget = note.SlideTo >= 0 ? note.SlideTo : note.SlideUnpitchTo;
+                    if (slideTarget >= 0)
+                    {
+                        DrawSlide(dc, x, radius, y, endX, right, fret, slideTarget,
+                            note.SlideUnpitchTo >= 0, sustainPen, noteFill, notePen, labelBrush);
+                    }
+                    else if (note.Tremolo)
+                    {
+                        DrawTremolo(dc, x + radius, endX, y, sustainPen);
+                    }
+                    else
+                    {
+                        dc.DrawLine(sustainPen, new Point(x + radius, y), new Point(endX, y));
+                    }
                 }
 
                 if (note.Bend > 0.001)
-                    DrawBend(dc, x, y, radius, regionTop, right, note.Bend, past);
+                    DrawBend(dc, x, y, radius, regionTop, right, note.Bend,
+                        state != NoteVisualState.Upcoming);
 
                 previousNoteX[stringIndex] = x;
                 previousNoteRadius[stringIndex] = radius;
             }
 
             if (chordTop < double.MaxValue && !string.IsNullOrWhiteSpace(note.ChordName))
-                DrawText(dc, note.ChordName, 13 * NotationScale, past ? Brushes.Gray : Brushes.White,
+                DrawText(dc, note.ChordName, 13 * NotationScale,
+                    state == NoteVisualState.Upcoming ? Brushes.White : Brushes.Gray,
                     new Point(x - 12, Math.Max(regionTop + 1, chordTop - 34)), FontWeights.SemiBold);
             if (chordTop < double.MaxValue && !string.IsNullOrWhiteSpace(note.Technique))
                 DrawText(dc, note.Technique, 11 * NotationScale, Brushes.LightGray,
@@ -298,6 +356,61 @@ public sealed class TabSurface : FrameworkElement
             dc.DrawLine(ProgressFillPen,
                 new Point(left, progressY), new Point(playhead, progressY));
         }
+    }
+
+    private void DrawTremolo(DrawingContext dc, double startX, double endX, double y, Pen pen)
+    {
+        if (endX <= startX + 1) return;
+
+        var step = Math.Max(5.0, 7.0 * NotationScale);
+        var amplitude = Math.Max(2.0, 3.2 * NotationScale);
+        var x = startX;
+        var previous = new Point(x, y);
+        var direction = -1.0;
+        while (x < endX)
+        {
+            x = Math.Min(endX, x + step);
+            var next = new Point(x, x >= endX ? y : y + direction * amplitude);
+            dc.DrawLine(pen, previous, next);
+            previous = next;
+            direction = -direction;
+        }
+    }
+
+    private void DrawSlide(DrawingContext dc, double x, double radius, double y,
+        double endX, double right, int sourceFret, int targetFret, bool unpitched,
+        Pen pen, Brush noteFill, Pen notePen, Brush labelBrush)
+    {
+        var startX = x + radius;
+        if (endX <= startX + 2) return;
+
+        var targetLabel = targetFret is >= 0 and < 25
+            ? FretLabels[targetFret]
+            : targetFret.ToString(CultureInfo.InvariantCulture);
+        var targetRadius = (targetLabel.Length > 1 ? 20.0 : 17.0) * NotationScale;
+        var targetVisible = endX + targetRadius <= right + 1;
+        var lineEndX = targetVisible ? endX - targetRadius : endX;
+        if (lineEndX <= startX + 2)
+        {
+            DrawText(dc, (targetFret >= sourceFret ? "/" : "\\") + targetLabel,
+                12 * NotationScale, labelBrush, new Point(x + radius + 2, y - 22 * NotationScale),
+                FontWeights.Bold);
+            return;
+        }
+
+        // Both fret numbers stay on their string, as in conventional TAB. The
+        // connecting stroke itself slopes up or down to make the slide direction
+        // readable at a glance. Unpitched slides use a slightly steeper stroke.
+        var direction = targetFret >= sourceFret ? -1.0 : 1.0;
+        var rise = (unpitched ? 6.0 : 4.0) * NotationScale;
+        dc.DrawLine(pen,
+            new Point(startX, y - direction * rise),
+            new Point(lineEndX, y + direction * rise));
+
+        if (!targetVisible) return;
+        dc.DrawEllipse(noteFill, notePen, new Point(endX, y), targetRadius, 17.0 * NotationScale);
+        var targetText = MakeText(targetLabel, 21 * NotationScale, labelBrush, FontWeights.Bold);
+        dc.DrawText(targetText, Snap(new Point(endX - targetText.Width / 2, y - targetText.Height / 2)));
     }
 
     private void DrawLegatoConnector(DrawingContext dc, double fromX, double fromRadius,
@@ -494,6 +607,13 @@ public sealed class TabSurface : FrameworkElement
         {
             var color = ((SolidColorBrush)brush).Color;
             return PenFrom(BrushFrom(alpha, color.R, color.G, color.B), thickness);
+        }).ToArray();
+
+    private static Brush[] CreateStringBrushes(byte alpha) =>
+        StringBrushes.Select(brush =>
+        {
+            var color = ((SolidColorBrush)brush).Color;
+            return (Brush)BrushFrom(alpha, color.R, color.G, color.B);
         }).ToArray();
 
     private void UpdateDpiCache()

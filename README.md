@@ -12,9 +12,11 @@ the game. No chart conversion or duplicate TAB file is required.
 - Rolling two-row TAB page (default) and a continuous scrolling view. The current
   row stays on top; the lower preview is promoted when the current row finishes.
 - Lead, Rhythm, and Bass paths, with the live path badge.
-- Chords, sustains, slides, bend arrows, H/P legato connectors, vibrato, taps,
-  slap/pop marks, measure numbers, and the current playhead.
-- Live hit, miss, and streak totals.
+- Chords, colored sustains, fret-to-fret slide slopes, tremolo-picking zigzags,
+  bend arrows, H/P legato connectors, vibrato, taps, slap/pop marks, measure
+  numbers, and the current playhead.
+- Live hit, miss, and streak totals. Finished notes retain a muted string color;
+  misses that can be correlated with Rocksmith's live counters turn gray.
 - Click-through, always-on-top overlay that follows the Rocksmith client window.
 - Automatically hides while Rocksmith is not the foreground window.
 - DPI-aware, resolution-independent layout.
@@ -148,6 +150,9 @@ GitHub Actions builds every push and pull request. Pushing a tag such as
 
 - Renders the authored **maximum difficulty** chart. It does not mirror Rocksmith's
   dynamic-difficulty omissions.
+- Rocksmith exposes aggregate hit/miss counters rather than per-note judgments.
+  Miss highlighting is therefore best-effort, and is deliberately conservative
+  when several judgments arrive in the same polling sample.
 - Harmonics, palm muting, and per-string techniques inside complex chords need
   richer flag decoding in a later pass.
 - The game process name is `Rocksmith2014`, and the default RockSniffer endpoint

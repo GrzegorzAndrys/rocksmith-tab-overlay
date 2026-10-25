@@ -83,5 +83,8 @@ public sealed class TabEvent
     [JsonPropertyName("Technique")] public string Technique { get; set; } = "";
     [JsonPropertyName("HammerOn")] public bool HammerOn { get; set; }
     [JsonPropertyName("PullOff")] public bool PullOff { get; set; }
+    [JsonPropertyName("Tremolo")] public bool Tremolo { get; set; }
     [JsonPropertyName("Bend")] public double Bend { get; set; }
+    [JsonPropertyName("SlideTo")] public int SlideTo { get; set; } = -1;
+    [JsonPropertyName("SlideUnpitchTo")] public int SlideUnpitchTo { get; set; } = -1;
 }

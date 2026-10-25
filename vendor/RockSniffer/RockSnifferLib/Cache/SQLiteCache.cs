@@ -13,7 +13,7 @@ namespace RockSnifferLib.Cache
 {
     public class SQLiteCache : ICache
     {
-        private const int CacheFormatVersion = 2;
+        private const int CacheFormatVersion = 3;
         private SQLiteConnection Connection { get; set; }
 
         public SQLiteCache()
