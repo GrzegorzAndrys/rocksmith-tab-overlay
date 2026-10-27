@@ -63,7 +63,7 @@ Copy-Item -LiteralPath (Join-Path $root 'vendor\RockSniffer\LICENSE') -Destinati
 Copy-Item -LiteralPath (Join-Path $root 'vendor\RockSniffer\RockSnifferLib\LICENSE') -Destination (Join-Path $licenses 'RockSnifferLib-MIT.txt') -Force
 Copy-Item -LiteralPath (Join-Path $root 'vendor\RockSniffer\Rocksmith2014PsarcLib\LICENSE') -Destination (Join-Path $licenses 'Rocksmith2014PsarcLib-MIT.txt') -Force
 
-foreach ($file in @('README.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'start-tab-overlay.ps1', 'run-sniffer-elevated.ps1', 'diagnose-overlay-window.ps1')) {
+foreach ($file in @('README.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'Start Rocksmith TAB Overlay.cmd', 'start-tab-overlay.ps1', 'run-sniffer-elevated.ps1', 'diagnose-overlay-window.ps1')) {
     $source = Join-Path $root $file
     if (Test-Path -LiteralPath $source) {
         Copy-Item -LiteralPath $source -Destination (Join-Path $dist $file) -Force

@@ -66,15 +66,25 @@ to save the layout and make the overlay click-through.
    page.
 2. Extract it to a writable folder. Do not put the runtime data in a read-only
    location such as `C:\Program Files`.
-3. Run `start-tab-overlay.ps1` and accept the UAC prompt.
+3. Double-click **`Start Rocksmith TAB Overlay.cmd`** and accept the UAC
+   prompt.
 4. Start Rocksmith, select a song and an arrangement, and play. The overlay
    appears when Rocksmith is the active window.
 
 If PowerShell blocks local scripts, run:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\start-tab-overlay.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File "D:\path\to\Tab App\start-tab-overlay.ps1"
 ```
+
+Use `-File`, not `-Command`, and keep the closing quote when the install path
+contains spaces.
+
+If launching fails, an error dialog now explains why. The same details are
+saved in `%LOCALAPPDATA%\RocksmithTabOverlay\launcher.log`; attach that small
+text file when reporting a launcher problem. The most common causes are
+extracting only the scripts instead of the complete release ZIP, cancelling
+the UAC prompt, or antivirus quarantining `RockSniffer.exe`.
 
 The launcher can be started before or after Rocksmith. The display reconnects to
 the active arrangement automatically. The first song may take a few seconds
@@ -177,6 +187,7 @@ GitHub Actions builds every push and pull request. Pushing a tag such as
 | `vendor/RockSniffer/` | Modified MIT-licensed RockSniffer clock/PSARC backend |
 | `build.ps1` | Local and CI build/publish script |
 | `start-tab-overlay.ps1` | User-facing UAC launcher |
+| `Start Rocksmith TAB Overlay.cmd` | Double-click launcher with visible errors |
 | `run-sniffer-elevated.ps1` | Starts the backend and overlay at the same privilege level |
 | `diagnose-overlay-window.ps1` | Writes `window-diagnostic.json` for display/attachment troubleshooting |
 

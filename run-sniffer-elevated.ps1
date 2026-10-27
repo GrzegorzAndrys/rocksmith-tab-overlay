@@ -1,11 +1,32 @@
 param(
     [switch]$Deploy,
     [switch]$DeployOverlay,
-    [switch]$RebuildCache
+    [switch]$RebuildCache,
+    [string]$LogPath
 )
 
 $ErrorActionPreference = 'Stop'
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$defaultLogDirectory = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'RocksmithTabOverlay'
+if ([string]::IsNullOrWhiteSpace($LogPath)) {
+    $LogPath = Join-Path $defaultLogDirectory 'launcher.log'
+}
+$logDirectory = Split-Path -Parent $LogPath
+
+function Write-LauncherLog([string]$message) {
+    if ($logDirectory) {
+        New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
+    }
+    Add-Content -LiteralPath $LogPath -Value ('[{0:yyyy-MM-dd HH:mm:ss.fff}] {1}' -f (Get-Date), $message)
+}
+
+trap {
+    try { Write-LauncherLog "ERROR: $($_.Exception.Message)" } catch { }
+    [Console]::Error.WriteLine($_.Exception.Message)
+    exit 1
+}
+
+Write-LauncherLog "Administrator launcher started from $scriptRoot"
 $dist = @(
     (Join-Path $scriptRoot 'dist'),
     $scriptRoot
@@ -58,7 +79,15 @@ if ($RebuildCache) {
 }
 
 if (-not (Get-Process -Name RockSniffer -ErrorAction SilentlyContinue)) {
-    Start-Process -FilePath $sniffer -WorkingDirectory (Split-Path -Parent $sniffer) -WindowStyle Hidden
+    Write-LauncherLog "Starting RockSniffer: $sniffer"
+    $snifferProcess = Start-Process -FilePath $sniffer -WorkingDirectory (Split-Path -Parent $sniffer) -WindowStyle Hidden -PassThru
+    Start-Sleep -Milliseconds 700
+    if ($snifferProcess.HasExited) {
+        throw "RockSniffer closed immediately with exit code $($snifferProcess.ExitCode). Check whether antivirus blocked or quarantined it."
+    }
+}
+else {
+    Write-LauncherLog 'RockSniffer is already running.'
 }
 
 # Rocksmith normally runs elevated on this installation. The overlay must run at
@@ -79,4 +108,11 @@ if ($DeployOverlay -or $newerOverlayIsStaged) {
     Copy-StagedFiles $stagedOverlay (Split-Path -Parent $overlay)
 }
 
-Start-Process -FilePath $overlay -WorkingDirectory (Split-Path -Parent $overlay)
+Write-LauncherLog "Starting overlay: $overlay"
+$overlayProcess = Start-Process -FilePath $overlay -WorkingDirectory (Split-Path -Parent $overlay) -PassThru
+Start-Sleep -Milliseconds 1000
+if ($overlayProcess.HasExited) {
+    throw "RocksmithTabOverlay closed immediately with exit code $($overlayProcess.ExitCode)."
+}
+$activeSniffer = Get-Process -Name RockSniffer | Select-Object -First 1
+Write-LauncherLog "Started successfully (RockSniffer PID $($activeSniffer.Id), overlay PID $($overlayProcess.Id))."
